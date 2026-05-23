@@ -6,6 +6,7 @@ Lists teaching demos, research projects, and op-eds:
 
 **Projects**
 - [Trump Posts × US Markets Explorer](https://geostrategist.github.io/trump-posts-markets/) — 川普推文與美股反應互動探索器
+- [從櫻花早開到夏季缺電](https://geostrategist.github.io/sakura-to-blackout/) — 氣候變遷通識教學設計，五模組資料素養課程（真實資料即時計算）
 - [MediWise · 智醫未來](https://mediwise99.netlify.app/) — AI for Healthcare 教學示範
 - [IBM Interactive · 國際企業管理 Streamlit 課堂工具](https://ibm999.streamlit.app/)
 
