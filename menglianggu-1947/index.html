@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>孟良崮戰役互動3D沙盤 · 1947</title>
+<meta name="description" content="孟良崮戰役互動3D沙盤：1947年5月華東野戰軍圍殲國軍整編第74師全過程，含地形、部隊移動、時間軸與天氣特效。">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",Roboto,Helvetica,Arial,sans-serif;
+  --color-text-primary:#e8edf3;
+  --color-text-secondary:#9fb0c0;
+  --color-border-secondary:#2a3642;
+  --color-background-secondary:#1a2530;
+}
+html,body{margin:0;padding:0;background:#0b1118;color:var(--color-text-primary);font-family:var(--font-sans)}
+.wrap{max-width:920px;margin:0 auto;padding:24px 16px 48px}
+.wrap h1{font-size:22px;font-weight:600;margin:0 0 4px}
+.wrap .sub{font-size:13px;color:var(--color-text-secondary);margin:0 0 18px;line-height:1.6}
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:rgba(10,16,24,.92);color:#fff;border:0.5px solid var(--color-border-secondary);padding:10px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .35s;pointer-events:none;z-index:50;max-width:80vw}
+#toast.on{opacity:1}
+.srv{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.chip{font-size:12px;padding:6px 10px;border-radius:8px;cursor:pointer;border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-primary)}
+.chip.on{background:var(--color-background-secondary);font-weight:500}
+.cam{font-size:12px;padding:5px 9px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>孟良崮戰役 互動3D沙盤</h1>
+<p class="sub">1947年5月13至16日，華東野戰軍（紅色，陳毅·粟裕）於山東孟良崮圍殲國軍整編第74師（藍色，張靈甫）的全過程。拖曳旋轉 · 滾輪縮放 · 點擊軍旗看部隊資訊。</p>
+<h2 class="srv">孟良崮戰役互動3D沙盤：1947年5月13至16日，華東野戰軍（紅色）於山東孟良崮圍殲國軍整編第74師（藍色）的全過程，含地形、部隊移動、時間軸與天氣特效。</h2>
+<div id="stage" style="position:relative;width:100%;height:480px;border-radius:12px;overflow:hidden;background:#0d141c;touch-action:none">
+<div id="hud" style="position:absolute;top:10px;left:12px;z-index:5;pointer-events:none;color:#fff;font-family:var(--font-sans)">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="background:#a32d2d;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;letter-spacing:2px">特別節目</span>
+<span style="font-size:13px;color:#cfd8e3">孟良崮戰役 1947</span>
+</div>
+<div id="hT" style="font-size:20px;font-weight:500;margin-top:6px;text-shadow:0 1px 3px rgba(0,0,0,.6)"></div>
+<div id="hD" style="font-size:12px;color:#cfd8e3;margin-top:2px"></div>
+</div>
+<div id="hW" style="position:absolute;top:12px;right:12px;z-index:5;pointer-events:none;color:#fff;font-size:12px;background:rgba(10,16,24,.55);padding:6px 10px;border-radius:8px"></div>
+<div id="card" style="position:absolute;top:84px;right:12px;z-index:5;pointer-events:none;opacity:0;transition:opacity .6s;background:rgba(10,16,24,.7);border-left:3px solid #888;padding:8px 12px;border-radius:0;color:#fff;max-width:200px">
+<div id="cN" style="font-size:16px;font-weight:500"></div>
+<div id="cR" style="font-size:11px;color:#c4cdd8;margin-top:2px"></div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;z-index:5;pointer-events:none;background:rgba(8,12,18,.72);padding:7px 12px;display:flex;gap:10px;align-items:flex-start">
+<span style="background:#a32d2d;color:#fff;font-size:11px;padding:2px 7px;border-radius:4px;flex:none;margin-top:1px">戰況速報</span>
+<div id="tick" style="font-size:12px;color:#e8edf3;line-height:1.5"></div>
+</div>
+<div id="hint" style="position:absolute;bottom:46px;right:12px;z-index:5;pointer-events:none;font-size:11px;color:#b9c4d0;background:rgba(10,16,24,.5);padding:4px 8px;border-radius:6px">拖曳旋轉 · 滾輪縮放 · 點擊軍旗看解說</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;align-items:center">
+<button id="play" class="chip" style="min-width:84px"><i class="ti ti-player-play" aria-hidden="true"></i> 播放全程</button>
+<span id="chips" style="display:flex;flex-wrap:wrap;gap:6px"></span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
+<span style="font-size:12px;color:var(--color-text-secondary)">導播機位</span>
+<button class="chip cam" data-v="aerial">全景空拍</button>
+<button class="chip cam" data-v="red">共軍視角</button>
+<button class="chip cam" data-v="blue">國軍視角</button>
+<button class="chip cam" data-v="peak">主峰特寫</button>
+<button id="orbit" class="chip cam">環繞鏡頭</button>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:14px">
+<div style="background:var(--color-background-secondary);border-radius:8px;padding:12px 14px">
+<div style="font-size:12px;color:var(--color-text-secondary)">國軍 整編74師 殘存兵力</div>
+<div id="bN" style="font-size:22px;font-weight:500;color:#185FA5;margin:4px 0">32,000</div>
+<div style="height:6px;border-radius:3px;background:rgba(120,140,160,.25)"><div id="bB" style="height:6px;border-radius:3px;background:#378ADD;width:100%;transition:width 1.2s"></div></div>
+</div>
+<div style="background:var(--color-background-secondary);border-radius:8px;padding:12px 14px">
+<div style="font-size:12px;color:var(--color-text-secondary)">華野攻擊集團（5縱隊圍攻＋4縱隊阻援）累計傷亡</div>
+<div id="rN" style="font-size:22px;font-weight:500;color:#A32D2D;margin:4px 0">0</div>
+<div style="height:6px;border-radius:3px;background:rgba(120,140,160,.25)"><div id="rB" style="height:6px;border-radius:3px;background:#E24B4A;width:0%;transition:width 1.2s"></div></div>
+</div>
+</div>
+<div style="display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--color-text-secondary);flex-wrap:wrap">
+<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#E24B4A;vertical-align:-1px"></span> 華東野戰軍（陳毅·粟裕）</span>
+<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#378ADD;vertical-align:-1px"></span> 國軍第1兵團（湯恩伯）</span>
+<span>箭頭＝該幕移動方向</span>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const stage=document.getElementById('stage');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0xbfd7e8);
+scene.fog=new THREE.Fog(0xbfd7e8,34,80);
+const cam=new THREE.PerspectiveCamera(46,1,0.1,200);
+const ren=new THREE.WebGLRenderer({antialias:true});
+ren.setPixelRatio(Math.min(devicePixelRatio,2));
+stage.insertBefore(ren.domElement,stage.firstChild);
+ren.domElement.style.cssText='position:absolute;inset:0;width:100%;height:100%';
+function fit(){const w=stage.clientWidth,h=stage.clientHeight;ren.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+new ResizeObserver(fit).observe(stage);fit();
+const amb=new THREE.AmbientLight(0xffffff,0.55);scene.add(amb);
+const sun=new THREE.DirectionalLight(0xfff2dd,0.95);sun.position.set(18,26,10);scene.add(sun);
+const fire=new THREE.PointLight(0xff7733,0,18);fire.position.set(0,4,0);scene.add(fire);
+const HS=[[0,0,3.4,2.4],[1.9,-0.8,2.6,1.5],[-1.9,0.9,2.3,1.4],[4.6,0.4,2.7,2.0],[-3.4,-0.5,2.0,1.4],[-8,0,2.3,1.9],[8.5,1,1.9,2.2],[-13,2,1.5,2.6],[12,-6,1.2,2.6],[-5,12.5,1.0,3],[6.5,12.5,1.1,3],[-10,-8,1.3,3],[10.5,-9,1.2,3],[14,5,1.4,2.4],[-15,-4,1.2,3]];
+function hAt(x,z){let h=0;for(const m of HS){const d=((x-m[0])*(x-m[0])+(z-m[1])*(z-m[1]))/(m[3]*m[3]);h+=m[2]*Math.exp(-d)}h+=0.28*Math.sin(x*0.5)*Math.cos(z*0.45)+0.14*Math.sin(x*1.3+z*0.7);h-=1.5*Math.exp(-Math.pow(z+13.5,2)/4.5);return Math.max(h,-0.5)}
+(function(){const g=new THREE.PlaneGeometry(48,38,150,120);g.rotateX(-Math.PI/2);const p=g.attributes.position,n=p.count,col=new Float32Array(n*3),c=new THREE.Color();
+for(let i=0;i<n;i++){const x=p.getX(i),z=p.getZ(i),h=hAt(x,z);p.setY(i,h);
+let hex;if(h<-0.22)hex=0x3f6e94;else if(h<0.35)hex=0x84955a;else if(h<1.1)hex=0x8d8852;else if(h<2.0)hex=0x957f58;else if(h<2.8)hex=0x9a9082;else hex=0xb6ae9f;
+c.setHex(hex);const v=0.94+Math.random()*0.1;col[i*3]=c.r*v;col[i*3+1]=c.g*v;col[i*3+2]=c.b*v}
+g.setAttribute('color',new THREE.BufferAttribute(col,3));g.computeVertexNormals();
+scene.add(new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true})))})();
+(function(){const geo=new THREE.ConeGeometry(0.16,0.5,5);const mat=new THREE.MeshLambertMaterial({color:0x3e5d33});const im=new THREE.InstancedMesh(geo,mat,160);const d=new THREE.Object3D();let k=0;
+while(k<160){const x=(Math.random()-0.5)*44,z=(Math.random()-0.5)*34,h=hAt(x,z);if(h>0.25&&h<1.3){d.position.set(x,h+0.22,z);const s=0.7+Math.random()*0.9;d.scale.set(s,s,s);d.updateMatrix();im.setMatrixAt(k,d.matrix);k++}}
+scene.add(im)})();
+function txSprite(text,fill,fs,bold){const c=document.createElement('canvas');const x=c.getContext('2d');const f=(bold?'500 ':'400 ')+fs+'px sans-serif';x.font=f;const w=Math.ceil(x.measureText(text).width)+16;c.width=w;c.height=fs+14;x.font=f;x.textBaseline='middle';x.lineWidth=4;x.strokeStyle='rgba(8,12,18,0.85)';x.strokeText(text,8,c.height/2);x.fillStyle=fill;x.fillText(text,8,c.height/2);
+const t=new THREE.CanvasTexture(c);t.minFilter=THREE.LinearFilter;const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false}));const sc=fs/26;s.scale.set(c.width/c.height*sc,sc,1);return s}
+const PLACES=[['孟良崮 575m',0,-0.4,1.1,17],['600高地',2.1,-1.0,0.7,12],['540高地',-2.1,1.1,0.7,12],['蘆山',4.8,0.3,0.8,12],['雕窩',-3.6,-0.7,0.7,12],['天馬山',-8,-0.2,0.9,13],['垛莊',-1,9.6,0.6,13],['坦埠',0,-15.2,0.6,13],['汶河',6,-13.4,0.45,12],['沂蒙山區',-16,9,0.8,12]];
+for(const p of PLACES){const s=txSprite(p[0],'#f2ede2',p[4],true);s.position.set(p[1],hAt(p[1],p[2])+p[3],p[2]);scene.add(s)}
+function flagTex(side){const c=document.createElement('canvas');c.width=128;c.height=80;const x=c.getContext('2d');
+if(side==='red'){x.fillStyle='#c0182c';x.fillRect(0,0,128,80);x.fillStyle='#ffd34d';const cx=34,cy=40,R=18;x.beginPath();for(let i=0;i<5;i++){const a=-Math.PI/2+i*2*Math.PI/5,b=a+Math.PI/5;x.lineTo(cx+R*Math.cos(a),cy+R*Math.sin(a));x.lineTo(cx+R*0.42*Math.cos(b),cy+R*0.42*Math.sin(b))}x.closePath();x.fill();x.font='500 26px serif';x.fillText('八一',66,50)}
+else{x.fillStyle='#d62b2b';x.fillRect(0,0,128,80);x.fillStyle='#10337a';x.fillRect(0,0,64,40);x.fillStyle='#fff';const cx=32,cy=20;for(let i=0;i<12;i++){const a=i*Math.PI/6;x.beginPath();x.moveTo(cx+15*Math.cos(a),cy+15*Math.sin(a));x.lineTo(cx+5*Math.cos(a+0.22),cy+5*Math.sin(a+0.22));x.lineTo(cx+5*Math.cos(a-0.22),cy+5*Math.sin(a-0.22));x.closePath();x.fill()}x.beginPath();x.arc(cx,cy,6.5,0,7);x.fill();x.strokeStyle='#10337a';x.lineWidth=2;x.stroke()}
+const t=new THREE.CanvasTexture(c);t.minFilter=THREE.LinearFilter;return t}
+const flags=[];const clickables=[];
+function makeUnit(u){const g=new THREE.Group();
+const base=new THREE.Mesh(new THREE.CylinderGeometry(0.34*u.sc,0.42*u.sc,0.22,16),new THREE.MeshLambertMaterial({color:u.side==='red'?0xd23b3b:0x2f7fd1}));base.position.y=0.11;g.add(base);
+const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,1.5*u.sc,6),new THREE.MeshLambertMaterial({color:0xd8d2c4}));pole.position.y=0.75*u.sc;g.add(pole);
+const fg=new THREE.PlaneGeometry(0.85*u.sc,0.5*u.sc,10,4);fg.translate(0.425*u.sc,0,0);
+const fm=new THREE.Mesh(fg,new THREE.MeshLambertMaterial({map:flagTex(u.side),side:THREE.DoubleSide}));fm.position.set(0.02,1.22*u.sc,0);g.add(fm);flags.push({m:fm,o:Math.random()*6,w:u.sc});
+const lab=txSprite(u.name+'·'+u.cmd,u.side==='red'?'#ffb3ad':'#a8d2ff',13,true);lab.position.y=1.75*u.sc;g.add(lab);
+if(u.str){const l2=txSprite(u.str,'#e3e0d6',10,false);l2.position.y=1.48*u.sc;g.add(l2)}
+const hit=new THREE.Mesh(new THREE.SphereGeometry(0.8*u.sc,8,8),new THREE.MeshBasicMaterial({visible:false}));hit.position.y=0.9;hit.userData=u;g.add(hit);clickables.push(hit);
+u.grp=g;u.cur=u.path[0].slice();place(u,u.path[0][0],u.path[0][1]);scene.add(g);return u}
+function place(u,x,z){u.grp.position.set(x,hAt(x,z)+0.02,z)}
+const UNITS=[
+{id:'k74',side:'blue',name:'整74師',cmd:'張靈甫',str:'3.2萬 全美械',sc:1.25,path:[[-0.5,8.5],[-0.3,4.5],[0.2,1.2],[0.2,0.2],[0,-0.3],[0,-0.3]]},
+{id:'k25',side:'blue',name:'整25師',cmd:'黃百韜',str:'西援主力',sc:1,path:[[-9.5,9],[-9,6.5],[-9.5,5],[-9,1.6],[-8.6,0.9],[-10,4.5]]},
+{id:'k83',side:'blue',name:'整83師',cmd:'李天霞',str:'東援·消極',sc:1,path:[[8.5,9.5],[8.5,8],[9,7.2],[8.6,5.8],[8.6,5.8],[9.6,8.5]]},
+{id:'k7',side:'blue',name:'桂系第7軍',cmd:'鍾紀',str:'',sc:0.8,path:[[14,3.5],[14,3.5],[14,3.5],[13.6,3.2],[13.6,3.2],[14.4,4.5]]},
+{id:'khq',side:'blue',name:'第1兵團部',cmd:'湯恩伯',str:'',sc:0.8,path:[[4,15],[4,15],[4,15],[4,15],[4,15],[4,15]]},
+{id:'phq',side:'red',name:'華野總部',cmd:'陳毅·粟裕',str:'',sc:1,path:[[0,-15.6],[0,-15.6],[0,-15.6],[0,-15.6],[0,-15.6],[0,-15.6]]},
+{id:'p4',side:'red',name:'4縱',cmd:'陶勇',str:'正面主攻',sc:0.95,path:[[-2.5,-11],[-2.3,-6],[-2,-3.6],[-1.6,-2.1],[-1.1,-1.3],[-1.1,-1.3]]},
+{id:'p9',side:'red',name:'9縱',cmd:'許世友',str:'正面主攻',sc:0.95,path:[[3,-11],[2.8,-6],[2.6,-3.6],[2.2,-2.1],[1.5,-1.3],[1.5,-1.3]]},
+{id:'p1',side:'red',name:'1縱',cmd:'葉飛',str:'西翼穿插',sc:0.95,path:[[-6.5,-9],[-5.8,-3.5],[-5.2,0.5],[-3.9,0.6],[-2.5,0.4],[-2.5,0.4]]},
+{id:'p8',side:'red',name:'8縱',cmd:'王建安',str:'東翼穿插',sc:0.95,path:[[7,-9],[6.2,-3.5],[5.6,1.6],[4.2,1.0],[2.7,0.8],[2.7,0.8]]},
+{id:'p6',side:'red',name:'6縱',cmd:'王必成',str:'奔襲垛莊',sc:0.95,path:[[-11,14.5],[-9.5,13.8],[-1.6,9.9],[-1.2,6],[-0.7,2.8],[-0.7,2.8]]},
+{id:'pw',side:'red',name:'阻援集團',cmd:'3·10縱',str:'西線',sc:0.8,path:[[-13.5,-1.5],[-13.5,-1.5],[-12.5,-1],[-11.5,-0.5],[-11.5,-0.5],[-11.5,-0.5]]},
+{id:'pe',side:'red',name:'阻援集團',cmd:'2·7縱',str:'東線',sc:0.8,path:[[13,-4.5],[13,-4.5],[12.4,-4],[12,-3.6],[12,-3.6],[12,-3.6]]}
+];
+UNITS.forEach(makeUnit);
+const PH=[
+{d:'1947年5月11–12日',t:'第一幕 驕兵深入',w:'<i class="ti ti-sun" aria-hidden="true"></i> 晴 · 山地乾燥',sky:0xbfd7e8,desc:'湯恩伯兵團「穩紮穩打」北犯沂蒙：整74師沿垛莊軸線直撲華野總部所在的坦埠，25師、83師兩翼掩護。粟裕決心捨弱打強，從敵陣中央「猛虎掏心」。',combat:[],card:['張靈甫','整編74師師長 · 黃埔四期 · 御林軍','blue'],s74:32000,sr:0},
+{d:'5月13日 黃昏至深夜',t:'第二幕 兩翼穿插',w:'<i class="ti ti-moon" aria-hidden="true"></i> 夜戰 · 晴',sky:0x8fa6bd,desc:'華野發起攻擊：1縱、8縱乘夜楔入74師與25師、83師之間的接合部，4縱、9縱正面強攻。74師兩翼逐漸被割裂。',combat:[[-4,-3],[4,-3],[0,-5.5]],card:['粟裕','華野副司令員 · 戰役指揮','red'],s74:30500,sr:1500},
+{d:'5月14日–15日拂曉',t:'第三幕 斷其退路 奔襲垛莊',w:'<i class="ti ti-sun" aria-hidden="true"></i> 晴 · 酷熱',sky:0xc9d6dd,desc:'6縱自魯南隱蔽地兩晝夜強行軍百餘里，與1縱一部於15日拂曉攻佔垛莊，74師後路被斷。張靈甫率3.2萬人退守孟良崮、600高地一線石山。',combat:[[-1.5,9.5],[-4.5,0.5],[5,1.2]],card:['王必成','6縱司令員 · 奔襲垛莊','red'],s74:26000,sr:3500},
+{d:'5月15日 全日',t:'第四幕 中心開花與總攻',w:'<i class="ti ti-temperature" aria-hidden="true"></i> 酷熱 · 石山無水',sky:0xe3d3b4,desc:'蔣介石令74師固守吸引華野，調十個整編師反包圍，欲「中心開花」。華野五個縱隊發起總攻，外線死守阻援；25師猛攻天馬山。空投糧彈多落於華野陣地，守軍缺水，機槍無法冷卻。',combat:[[-1.6,-1],[1.6,-1],[-1,1],[1.2,1],[-8.6,0.4]],card:['黃百韜','整25師師長 · 血戰天馬山','blue'],s74:21000,sr:7000},
+{d:'5月16日 午後',t:'第五幕 攻克主峰',w:'<i class="ti ti-sun-high" aria-hidden="true"></i> 酷熱 · 煙塵蔽日',sky:0xd8c4a6,desc:'華野相繼攻佔600高地與主峰，74師指揮所被毀，張靈甫陣亡。黃百韜部攻抵天馬山附近，距孟良崮僅約5公里，功虧一簣。整74師全軍覆沒，俘虜約1.9萬人。',combat:[[0,-0.2],[0.6,-0.6],[-0.6,0.4],[-8.4,0.2]],card:['張靈甫','陣亡於主峰山洞指揮所','blue'],s74:4000,sr:12000},
+{d:'5月16日 黃昏',t:'終幕 大雨傾盆 戰役落幕',w:'<i class="ti ti-cloud-rain" aria-hidden="true"></i> 大雨 · 山洪',sky:0x5e6b78,desc:'戰役結束當晚山區降下大雨。華野連夜打掃戰場、迅速北移；國軍各路援軍就地收兵。此役全殲國軍五大主力之首整編74師約3.2萬人，華野傷亡約1.2萬，扭轉山東戰局。',combat:[],card:['陳毅','華野司令員 · 「百萬軍中取上將首級」','red'],s74:0,sr:12000}
+];
+const arrows=[];let tw=null;
+function setPhase(i,instant){
+PH.cur=i;const ph=PH[i];
+document.getElementById('hT').textContent=ph.t;
+document.getElementById('hD').textContent=ph.d;
+document.getElementById('hW').innerHTML=ph.w;
+document.getElementById('tick').textContent=ph.desc;
+document.getElementById('bN').textContent=ph.s74.toLocaleString();
+document.getElementById('bB').style.width=(ph.s74/320)+'%';
+document.getElementById('rN').textContent=ph.sr.toLocaleString();
+document.getElementById('rB').style.width=(ph.sr/150)+'%';
+document.querySelectorAll('#chips .chip').forEach((b,k)=>b.classList.toggle('on',k===i));
+const cd=document.getElementById('card');cd.style.borderLeftColor=ph.card[2]==='red'?'#E24B4A':'#378ADD';
+document.getElementById('cN').textContent=ph.card[0];document.getElementById('cR').textContent=ph.card[1];
+cd.style.opacity=1;clearTimeout(cd._t);cd._t=setTimeout(()=>cd.style.opacity=0,5000);
+arrows.forEach(a=>scene.remove(a));arrows.length=0;
+const moves=[];
+for(const u of UNITS){const to=u.path[i];const from=u.cur.slice();
+if(!instant&&Math.hypot(to[0]-from[0],to[1]-from[1])>0.4){
+const f=new THREE.Vector3(from[0],hAt(from[0],from[1])+0.6,from[1]);
+const t3=new THREE.Vector3(to[0],hAt(to[0],to[1])+0.6,to[1]);
+const dir=t3.clone().sub(f);const L=dir.length();
+const ah=new THREE.ArrowHelper(dir.normalize(),f,L,u.side==='red'?0xff6b5e:0x6db1ff,Math.min(0.8,L*0.3),0.35);
+scene.add(ah);arrows.push(ah)}
+moves.push({u,from,to})}
+tw={t:0,moves,dur:instant?0.01:2.6};
+if(i===5){UNITS[0].grp.visible=false;cap.visible=true}else{UNITS[0].grp.visible=true;cap.visible=false}
+skyT.setHex(ph.sky);
+if(i===3||i===4){sun.color.setHex(0xffe0b0);amb.intensity=0.5}else if(i===5){sun.color.setHex(0x9fb2c4);sun.intensity=0.5;amb.intensity=0.42}else{sun.color.setHex(0xfff2dd);sun.intensity=0.95;amb.intensity=0.55}
+}
+const cap=txSprite('✕ 整74師被殲 · 張靈甫陣亡','#ffd9d4',15,true);cap.position.set(0,hAt(0,0)+1.6,0);cap.visible=false;scene.add(cap);
+const skyT=new THREE.Color(0xbfd7e8);
+const chips=document.getElementById('chips');
+PH.forEach((p,i)=>{const b=document.createElement('button');b.className='chip';b.textContent=(i+1)+'. '+p.d.replace('1947年','');b.onclick=()=>{stopPlay();setPhase(i)};chips.appendChild(b)});
+let playing=false,pT=0;
+const pb=document.getElementById('play');
+function stopPlay(){playing=false;pb.innerHTML='<i class="ti ti-player-play" aria-hidden="true"></i> 播放全程'}
+pb.onclick=()=>{if(playing){stopPlay()}else{playing=true;pT=0;pb.innerHTML='<i class="ti ti-player-pause" aria-hidden="true"></i> 暫停';if(PH.cur>=5)setPhase(0)}};
+let sph={r:30,po:0.62,az:-0.35},sphT={r:30,po:0.62,az:-0.35},auto=false;
+const VIEWS={aerial:{r:30,po:0.62,az:-0.35},red:{r:23,po:1.18,az:Math.PI-0.15},blue:{r:23,po:1.18,az:0.15},peak:{r:10.5,po:1.0,az:0.7}};
+document.querySelectorAll('.cam[data-v]').forEach(b=>b.onclick=()=>{auto=false;document.getElementById('orbit').classList.remove('on');Object.assign(sphT,VIEWS[b.dataset.v])});
+document.getElementById('orbit').onclick=function(){auto=!auto;this.classList.toggle('on',auto)};
+let drag=false,px=0,py=0,moved=0;
+const el=ren.domElement;
+el.addEventListener('pointerdown',e=>{drag=true;moved=0;px=e.clientX;py=e.clientY;el.setPointerCapture(e.pointerId)});
+el.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-px,dy=e.clientY-py;moved+=Math.abs(dx)+Math.abs(dy);px=e.clientX;py=e.clientY;sphT.az-=dx*0.006;sph.az=sphT.az;sphT.po=Math.min(1.42,Math.max(0.15,sphT.po-dy*0.005));sph.po=sphT.po;auto=false});
+el.addEventListener('pointerup',e=>{drag=false;if(moved<6)pick(e)});
+el.addEventListener('wheel',e=>{e.preventDefault();sphT.r=Math.min(48,Math.max(6,sphT.r+e.deltaY*0.02))},{passive:false});
+const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
+let toastT;
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),3600)}
+function pick(e){const r=el.getBoundingClientRect();mv.x=((e.clientX-r.left)/r.width)*2-1;mv.y=-((e.clientY-r.top)/r.height)*2+1;ray.setFromCamera(mv,cam);const h=ray.intersectObjects(clickables);if(h.length){const u=h[0].object.userData;const cd=document.getElementById('card');cd.style.borderLeftColor=u.side==='red'?'#E24B4A':'#378ADD';document.getElementById('cN').textContent=u.name;document.getElementById('cR').textContent='指揮官：'+u.cmd+(u.str?' · '+u.str:'');cd.style.opacity=1;clearTimeout(cd._t);cd._t=setTimeout(()=>cd.style.opacity=0,6000);showToast((u.side==='red'?'華東野戰軍 · ':'國軍 · ')+u.name+'（'+u.cmd+'）')}}
+function mkPuff(){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');const g=x.createRadialGradient(32,32,2,32,32,30);g.addColorStop(0,'rgba(255,235,180,1)');g.addColorStop(0.35,'rgba(255,140,50,0.9)');g.addColorStop(1,'rgba(60,40,20,0)');x.fillStyle=g;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c)}
+function mkSmoke(){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');const g=x.createRadialGradient(32,32,4,32,32,30);g.addColorStop(0,'rgba(120,120,120,0.55)');g.addColorStop(1,'rgba(120,120,120,0)');x.fillStyle=g;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c)}
+const puffTex=mkPuff(),smkTex=mkSmoke();
+const booms=[];for(let i=0;i<14;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex,transparent:true,depthWrite:false,opacity:0}));scene.add(s);booms.push({s,t:1})}
+const smokes=[];for(let i=0;i<10;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:smkTex,transparent:true,depthWrite:false,opacity:0}));scene.add(s);smokes.push({s,t:Math.random()})}
+const trMat=new THREE.LineBasicMaterial({color:0xffd27a,transparent:true});
+const tracers=[];for(let i=0;i<20;i++){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const l=new THREE.Line(g,trMat.clone());l.visible=false;scene.add(l);tracers.push({l,t:1})}
+const rainN=1400,rg=new THREE.BufferGeometry(),rp=new Float32Array(rainN*3);
+for(let i=0;i<rainN;i++){rp[i*3]=(Math.random()-0.5)*44;rp[i*3+1]=Math.random()*16;rp[i*3+2]=(Math.random()-0.5)*36}
+rg.setAttribute('position',new THREE.BufferAttribute(rp,3));
+const rain=new THREE.Points(rg,new THREE.PointsMaterial({color:0xaec4d6,size:0.09,transparent:true,opacity:0.7}));rain.visible=false;scene.add(rain);
+function spawnFx(hot){
+const b=booms.find(o=>o.t>=1);if(b&&Math.random()<0.5){const h=hot[Math.floor(Math.random()*hot.length)];const x=h[0]+(Math.random()-0.5)*1.6,z=h[1]+(Math.random()-0.5)*1.6;b.s.position.set(x,hAt(x,z)+0.4,z);b.t=0}
+const tr=tracers.find(o=>o.t>=1);if(tr){const h=hot[Math.floor(Math.random()*hot.length)];const x=h[0]+(Math.random()-0.5)*2.2,z=h[1]+(Math.random()-0.5)*2.2;const y=hAt(x,z)+0.5;const a=Math.random()*6.28;const p=tr.l.geometry.attributes.position;p.setXYZ(0,x,y,z);p.setXYZ(1,x+Math.cos(a)*1.4,y+0.4+Math.random()*0.5,z+Math.sin(a)*1.4);p.needsUpdate=true;tr.t=0;tr.l.visible=true}}
+const clock=new THREE.Clock();
+setPhase(0,true);
+function anim(){requestAnimationFrame(anim);const dt=Math.min(clock.getDelta(),0.05);const T=clock.elapsedTime;
+if(tw){tw.t+=dt/tw.dur;const k=Math.min(1,tw.t),e=k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+for(const m of tw.moves){const x=m.from[0]+(m.to[0]-m.from[0])*e,z=m.from[1]+(m.to[1]-m.from[1])*e;m.u.cur=[x,z];place(m.u,x,z)}
+if(k>=1){tw=null;arrows.forEach(a=>{a.traverse(o=>{if(o.material){o.material.transparent=true}})});setTimeout(()=>{arrows.forEach(a=>scene.remove(a));arrows.length=0},2200)}}
+for(const f of flags){const p=f.m.geometry.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i);p.setZ(i,Math.sin(x*7/f.w+T*5+f.o)*0.09*(x/(0.85*f.w)))}p.needsUpdate=true;f.m.geometry.computeVertexNormals()}
+const ph=PH[PH.cur];
+if(ph.combat.length){if(Math.random()<0.55)spawnFx(ph.combat);fire.intensity=1.2+Math.random()*2.2;fire.position.set(ph.combat[0][0],hAt(ph.combat[0][0],ph.combat[0][1])+1.5,ph.combat[0][1]);
+for(const s of smokes){s.t+=dt*0.25;if(s.t>1){s.t=0;const h=ph.combat[Math.floor(Math.random()*ph.combat.length)];s.s.position.set(h[0]+(Math.random()-0.5)*2,hAt(h[0],h[1])+0.6,h[1]+(Math.random()-0.5)*2);s.base=s.s.position.y}
+s.s.position.y=(s.base||1)+s.t*2.2;s.s.material.opacity=0.5*(1-s.t);const sc=0.8+s.t*2.4;s.s.scale.set(sc,sc,1)}}
+else{fire.intensity=0;smokes.forEach(s=>s.s.material.opacity=0)}
+for(const b of booms){if(b.t<1){b.t+=dt*1.6;const sc=0.3+b.t*2.0;b.s.scale.set(sc,sc,1);b.s.material.opacity=Math.max(0,1-b.t)}}
+for(const tr of tracers){if(tr.t<1){tr.t+=dt*3;tr.l.material.opacity=1-tr.t;if(tr.t>=1)tr.l.visible=false}}
+if(PH.cur===5){rain.visible=true;const p=rg.attributes.position;for(let i=0;i<rainN;i++){let y=p.getY(i)-dt*14;if(y<0)y=15;p.setY(i,y)}p.needsUpdate=true;
+if(Math.random()<0.004){amb.intensity=1.3;setTimeout(()=>amb.intensity=0.42,90)}}
+else rain.visible=false;
+scene.background.lerp(skyT,0.03);scene.fog.color.copy(scene.background);
+if(playing&&!tw){pT+=dt;if(pT>5.5){pT=0;if(PH.cur<5){auto=true;document.getElementById('orbit').classList.add('on');setPhase(PH.cur+1)}else stopPlay()}}
+if(auto)sphT.az+=dt*0.12;
+sph.r+=(sphT.r-sph.r)*0.06;sph.po+=(sphT.po-sph.po)*0.06;sph.az+=(sphT.az-sph.az)*0.06;
+cam.position.set(sph.r*Math.sin(sph.po)*Math.sin(sph.az),sph.r*Math.cos(sph.po)+1.5,sph.r*Math.sin(sph.po)*Math.cos(sph.az));
+cam.lookAt(0,1.2,0);
+ren.render(scene,cam)}
+anim();
+</script>
+</div>
+<div id="toast"></div>
+</body>
+</html>
