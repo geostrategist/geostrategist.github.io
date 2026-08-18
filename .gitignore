@@ -2,3 +2,10 @@
 Thumbs.db
 .vscode/
 .idea/
+
+# 機敏檔案：救援碼、金鑰、憑證
+github-recovery-codes.txt
+*recovery-codes*
+*.pem
+*.key
+.env
