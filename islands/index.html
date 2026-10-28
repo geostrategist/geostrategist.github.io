@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>html,body{margin:0;height:100%}</style>
+<title>實踐國企群島</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Noto+Sans+TC:wght@400;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap">
+<style>
+/* Layout: full-screen toy archipelago in three.js; a floating header, a slide-in dossier panel for the selected island, and overlay views (list / timeline / log). */
+:root{
+  --bg:#1F5F8F;          /* harbour blue (host ground) */
+  --bg-2:#FFF8EC;
+  --fg:#2B2320;          /* ink */
+  --muted:#6E5A50;
+  --panel:#FFFDF8;
+  --line:#2B2320;
+  --accent:#DB6A41;      /* policy-island terracotta */
+  --accent-2:#1F6FB2;    /* sea blue */
+  --chip:#FFE9D6;
+  --shadow:0 8px 0 rgba(43,35,32,.18),0 14px 30px rgba(10,40,70,.28);
+  --font-display:"M PLUS Rounded 1c","Noto Sans TC","Noto Sans JP","Noto Sans SC",system-ui,sans-serif;
+  --font-body:"Noto Sans TC","Noto Sans JP","Noto Sans SC",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#13243B; --bg-2:#2A2F3E; --fg:#FFF4E6; --muted:#D3B9A6;
+    --panel:#1E2536; --line:#FFF4E6; --accent:#F08A5C; --accent-2:#6FB6F0;
+    --chip:#3A3140; --shadow:0 8px 0 rgba(0,0,0,.35),0 14px 30px rgba(0,0,0,.5); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#13243B; --bg-2:#2A2F3E; --fg:#FFF4E6; --muted:#D3B9A6;
+  --panel:#1E2536; --line:#FFF4E6; --accent:#F08A5C; --accent-2:#6FB6F0;
+  --chip:#3A3140; --shadow:0 8px 0 rgba(0,0,0,.35),0 14px 30px rgba(0,0,0,.5); color-scheme:dark;
+}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);overflow:hidden;position:relative;font-size:15px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+#stage{position:absolute;inset:0;touch-action:none}
+canvas{display:block;outline:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px;border-radius:12px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* header */
+#hud{position:absolute;left:0;right:0;top:env(safe-area-inset-top,0px);z-index:5;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));pointer-events:none}
+#hud>*{pointer-events:auto}
+.brand{display:flex;flex-direction:column;gap:2px;min-width:0}
+.brand .eyebrow{font-family:var(--font-display);font-weight:800;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#fff;background:var(--accent);padding:2px 8px;border-radius:6px;align-self:flex-start}
+.brand h1{margin:0;font-family:var(--font-display);font-weight:800;font-size:clamp(22px,3.6vw,32px);line-height:1.1;text-wrap:balance;color:#fff;text-shadow:0 2px 0 rgba(43,35,32,.6),0 0 18px rgba(0,0,0,.35)}
+.brand .sub{font-size:13px;font-weight:700;color:#fff;text-shadow:0 1px 0 rgba(43,35,32,.6)}
+.lang{display:flex;gap:4px;background:var(--panel);border:2px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow);flex-wrap:wrap;justify-content:flex-end}
+.lang button{padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800;color:var(--fg);white-space:nowrap}
+.lang button[aria-pressed="true"]{background:var(--accent);color:#fff}
+
+/* toolbar */
+#bar{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;justify-content:center;gap:8px;padding-top:10px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));pointer-events:none;flex-wrap:wrap}
+#bar>*{pointer-events:auto}
+.group{display:flex;gap:2px;background:var(--panel);border:2px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow)}
+.group button{padding:7px 13px;border-radius:999px;font-size:13px;font-weight:800;color:var(--fg);white-space:nowrap;display:flex;align-items:center;gap:6px}
+.group button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.group button .k{font-family:var(--font-display);font-size:14px;line-height:1}
+#hint{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:4;font-size:14px;font-weight:800;color:var(--fg);background:var(--panel);border:2px solid var(--line);border-radius:999px;padding:6px 14px;box-shadow:var(--shadow);white-space:nowrap;transition:opacity .4s}
+#hint.off{opacity:0;pointer-events:none}
+
+/* floating island labels */
+.tag{position:absolute;left:0;top:0;z-index:3;transform:translate(-50%,-100%);pointer-events:none;font-family:var(--font-display);font-weight:800;font-size:14px;padding:6px 12px;border-radius:999px;background:var(--panel);border:3px solid var(--line);border-bottom-width:5px;border-bottom-color:var(--c,var(--accent));color:var(--fg);box-shadow:var(--shadow);white-space:nowrap;opacity:0;transition:opacity .2s}
+.tag.on{opacity:1}
+.tag small{display:block;font-family:var(--font-body);font-weight:400;font-size:11px;color:var(--muted)}
+
+/* dossier panel */
+#panel{position:absolute;top:0;right:0;bottom:0;z-index:6;width:min(420px,100%);background:var(--panel);border-left:3px solid var(--line);box-shadow:var(--shadow);transform:translateX(104%);transition:transform .45s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-right:env(safe-area-inset-right,0px)}
+#panel.open{transform:none}
+#panel .head{padding:18px 20px 12px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}
+#panel .swatch{width:44px;height:44px;border-radius:14px;flex:none;background:var(--c);box-shadow:inset 0 -6px 0 rgba(0,0,0,.12)}
+#panel h2{margin:0;font-family:var(--font-display);font-size:20px;font-weight:800;line-height:1.15;text-wrap:balance}
+#panel .head p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+#panel .x{margin-left:auto;font-size:20px;line-height:1;padding:4px 8px;border-radius:10px;color:var(--muted)}
+#panel .body{overflow:auto;padding:14px 20px 28px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.desc{margin:0;font-size:14px;line-height:1.7;padding:12px 14px;border-left:5px solid var(--c);background:var(--chip);border-radius:0 12px 12px 0}
+.item{border:2px solid var(--line);border-radius:16px;padding:12px 14px;background:var(--bg-2);box-shadow:4px 4px 0 var(--c);display:flex;flex-direction:column;gap:6px}
+.item .meta{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.item .meta .d{font-family:var(--font-display);font-weight:800;color:var(--accent)}
+.item h3{margin:0;font-size:15px;font-weight:700;line-height:1.4}
+.item p{margin:0;font-size:13px;color:var(--fg)}
+.links{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.links button{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--chip);border:1px solid var(--line)}
+.links button::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:5px;vertical-align:1px}
+.src{font-size:11px;color:var(--muted)}
+.src a{color:var(--accent-2)}
+
+/* overlay views */
+.view{position:absolute;inset:0;z-index:7;background:var(--bg-2);overflow:auto;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(110px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.view .wrap{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.view h2{font-family:var(--font-display);font-weight:800;font-size:22px;margin:0}
+.view .lede{color:var(--fg);margin:0;max-width:60ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.card{border:2px solid var(--line);border-radius:18px;background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0;border-top:8px solid var(--c);box-shadow:5px 5px 0 rgba(43,35,32,.25)}
+.card h3{margin:0;font-family:var(--font-display);font-weight:800;font-size:17px}
+.card .n{font-size:12px;color:var(--muted)}
+.card .cd{margin:0;font-size:13px;line-height:1.6;color:var(--fg)}
+.card ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.card li{font-size:13px;display:flex;gap:8px;align-items:flex-start}
+.card li .d{font-family:var(--font-display);font-weight:800;color:var(--accent);font-size:11px;white-space:nowrap;padding-top:2px;font-variant-numeric:tabular-nums}
+.card li button{text-align:left;padding:0;line-height:1.4}
+.card li button:hover{color:var(--accent)}
+.tl{display:flex;flex-direction:column;gap:0;border-left:3px solid var(--line);margin-left:6px;padding-left:18px}
+.tl .row{position:relative;padding:8px 0 14px;display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start}
+.tl .row::before{content:"";position:absolute;left:-26.5px;top:14px;width:12px;height:12px;border-radius:50%;background:var(--c);border:3px solid var(--bg)}
+.tl .d{font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:2px}
+.tl .t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.tl .t b{font-weight:700;font-size:14px;line-height:1.4}
+.tl .t button{text-align:left;padding:0}
+.tl .isl{font-size:11px;font-weight:700;color:var(--c)}
+@media (max-width:520px){.tl .row{grid-template-columns:1fr}.tl .d{padding-top:0}}
+
+/* log drawer */
+#log{position:absolute;left:0;top:0;bottom:0;z-index:6;width:min(340px,100%);background:var(--panel);border-right:3px solid var(--line);box-shadow:var(--shadow);transform:translateX(-104%);transition:transform .45s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-left:env(safe-area-inset-left,0px)}
+#log.open{transform:none}
+#log .head{padding:18px 18px 10px;border-bottom:1px solid var(--line)}
+#log .eyebrow{font-family:var(--font-display);font-weight:800;font-size:11px;letter-spacing:.18em;color:var(--accent);display:flex;align-items:center;gap:8px}
+#log .eyebrow i{width:8px;height:8px;border-radius:50%;background:#4CC37A;box-shadow:0 0 0 4px rgba(76,195,122,.25);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 1px rgba(76,195,122,.1)}}
+#log h2{margin:4px 0 0;font-family:var(--font-display);font-weight:800;font-size:18px}
+#log .body{overflow:auto;padding:10px 18px 24px;display:flex;flex-direction:column;gap:2px;font-size:13px}
+#log .ln{display:grid;grid-template-columns:70px 1fr;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);align-items:start}
+#log .ln .d{font-family:var(--font-display);font-weight:800;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:2px}
+#log .ln button{text-align:left;padding:0;line-height:1.4}
+#log .ln button b{color:var(--c);font-size:11px;display:block}
+
+/* intro */
+#intro{position:absolute;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:rgba(20,50,85,.45);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));transition:opacity .5s}
+#intro.off{opacity:0;pointer-events:none}
+.intro-card{background:var(--panel);border:3px solid var(--line);border-radius:28px;box-shadow:var(--shadow);padding:28px 28px 24px;max-width:520px;width:100%;display:flex;flex-direction:column;gap:12px}
+.intro-card .eyebrow{font-family:var(--font-display);font-weight:800;font-size:12px;letter-spacing:.2em;color:var(--accent)}
+.intro-card h2{margin:0;font-family:var(--font-display);font-weight:800;font-size:clamp(24px,5vw,34px);line-height:1.15;text-wrap:balance}
+.intro-card p{margin:0;color:var(--muted)}
+.intro-card .count{display:flex;gap:18px;font-family:var(--font-display);font-weight:800;font-size:14px}
+.intro-card .count b{font-size:28px;display:block;color:var(--accent);line-height:1}
+.intro-card .go{align-self:flex-start;background:var(--accent);color:#fff;font-family:var(--font-display);font-weight:800;font-size:16px;padding:12px 24px;border-radius:999px;border:2px solid var(--line);box-shadow:0 5px 0 var(--line);transition:transform .1s}
+.intro-card .go:active{transform:translateY(3px)}
+.intro-card .legend{display:flex;flex-wrap:wrap;gap:6px}
+.intro-card .legend span{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--chip);border:1px solid var(--line)}
+.intro-card .legend span i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:5px}
+#loading{font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+
+<header id="hud">
+  <div class="brand">
+    <span class="eyebrow">SHIH CHIEN · IBM ISLANDS</span>
+    <h1 data-i="brand">實踐國企群島</h1>
+    <span class="sub" data-i="sub">一座島一個主題，一座相連的商業城市</span>
+  </div>
+  <nav class="lang" aria-label="language">
+    <button data-lang="tw" aria-pressed="true">繁體</button>
+    <button data-lang="cn" aria-pressed="false">简体</button>
+    <button data-lang="ja" aria-pressed="false">日本語</button>
+    <button data-lang="id" aria-pressed="false">Indonesia</button>
+    <button data-lang="vi" aria-pressed="false">Tiếng Việt</button>
+  </nav>
+</header>
+
+<div id="hint" data-i="hint">點一座島，開始探索</div>
+
+<div id="bar">
+  <div class="group" role="tablist">
+    <button id="v-3d" aria-pressed="true" data-view="3d"><span class="k">◎</span><span data-i="v3d">全景</span></button>
+    <button id="v-list" aria-pressed="false" data-view="list"><span class="k">☰</span><span data-i="vlist">清單</span></button>
+    <button id="v-time" aria-pressed="false" data-view="time"><span class="k">◷</span><span data-i="vtime">時間</span></button>
+  </div>
+  <div class="group">
+    <button id="m-tags" aria-pressed="true"><span data-i="mtags">名牌</span></button>
+    <button id="m-lines" aria-pressed="true"><span data-i="mlines">協作線</span></button>
+    <button id="m-pause" aria-pressed="false"><span data-i="mpause">暫停</span></button>
+    <button id="m-bird" aria-pressed="false"><span data-i="mbird">鳥瞰</span></button>
+    <button id="m-log" aria-pressed="false"><span data-i="mlog">日誌</span></button>
+  </div>
+</div>
+
+<aside id="panel" aria-live="polite">
+  <div class="head">
+    <div class="swatch"></div>
+    <div style="min-width:0"><h2 id="p-title"></h2><p id="p-sub"></p></div>
+    <button class="x" id="p-close" aria-label="close">✕</button>
+  </div>
+  <div class="body" id="p-body"></div>
+</aside>
+
+<aside id="log">
+  <div class="head">
+    <div class="eyebrow"><i></i>ISLAND LOG · LIVE</div>
+    <h2 data-i="logtitle">群島日誌</h2>
+    <div style="font-size:12px;color:var(--muted)" data-i="updated">資料更新 2026年10月29日</div>
+  </div>
+  <div class="body" id="log-body"></div>
+</aside>
+
+<section class="view" id="view-list" hidden><div class="wrap">
+  <h2 data-i="listh">所有島嶼與資訊</h2><p class="lede" data-i="listp">從任一則資訊進入它所在的島。</p>
+  <div class="grid" id="list-grid"></div>
+</div></section>
+
+<section class="view" id="view-time" hidden><div class="wrap">
+  <h2 data-i="timeh">時間軸</h2><p class="lede" data-i="timep">依發布日期排列，最新在上。</p>
+  <div class="tl" id="tl"></div>
+</div></section>
+
+<div id="intro">
+  <div class="intro-card">
+    <span class="eyebrow">THE ISLAND INDEX</span>
+    <h2 data-i="introh">把五管、AI、稅務與台積電，連起來。</h2>
+    <p data-i="introp">一座島一個主題，島上的建築是最新資訊。選一座島，走進它的城市風景；協作線會告訴你，這則新聞還牽動了哪幾座島。</p>
+    <div class="count"><div><b id="c-isl">8</b><span data-i="cisl">座主題島</span></div><div><b id="c-item">0</b><span data-i="citem">則最新資訊</span></div></div>
+    <div class="legend" id="legend"></div>
+    <button class="go" id="go" data-i="go">走進群島</button>
+    <div id="loading" data-i="loading">正在組合群島…</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ---------------- i18n ---------------- */
+const L=(tw,cn,ja,id,vi)=>({tw,cn,ja,id,vi});
+const UI={
+ brand:L("實踐國企群島","实践国企群岛","実践国企群島","Kepulauan IBM Shih Chien","Quần đảo IBM Thực Tiễn"),
+ sub:L("一座島一個主題，一座相連的商業城市","一座岛一个主题，一座相连的商业城市","一つの島に一つのテーマ、つながる商業都市","Satu pulau satu tema, satu kota bisnis yang saling terhubung","Mỗi đảo một chủ đề, một thành phố kinh doanh kết nối"),
+ hint:L("點一座島，開始探索","点一座岛，开始探索","島をタップして探索を始める","Ketuk sebuah pulau untuk mulai menjelajah","Chạm vào một đảo để bắt đầu khám phá"),
+ v3d:L("全景","全景","全景","Panorama","Toàn cảnh"),vlist:L("清單","清单","一覧","Daftar","Danh sách"),vtime:L("時間","时间","時間","Waktu","Thời gian"),
+ mtags:L("名牌","名牌","名札","Label","Nhãn"),mlines:L("協作線","协作线","関連線","Garis relasi","Đường liên kết"),mpause:L("暫停","暂停","一時停止","Jeda","Tạm dừng"),mbird:L("鳥瞰","鸟瞰","俯瞰","Pandangan atas","Nhìn từ trên"),mlog:L("日誌","日志","ログ","Log","Nhật ký"),
+ logtitle:L("群島日誌","群岛日志","群島ログ","Log Kepulauan","Nhật ký quần đảo"),
+ updated:L("資料更新 2026年10月29日","数据更新 2026年10月29日","データ更新 2026年10月29日","Diperbarui 29 Oktober 2026","Cập nhật ngày 29/10/2026"),
+ listh:L("所有島嶼與資訊","所有岛屿与信息","すべての島と情報","Semua pulau dan informasi","Tất cả các đảo và thông tin"),
+ listp:L("從任一則資訊進入它所在的島。","从任一条信息进入它所在的岛。","どの情報からでも、その島へ入れます。","Masuk ke pulau dari informasi mana pun.","Vào đảo từ bất kỳ thông tin nào."),
+ timeh:L("時間軸","时间轴","タイムライン","Garis waktu","Dòng thời gian"),
+ timep:L("依發布日期排列，最新在上。","按发布日期排列，最新在上。","公開日順、新しいものが上。","Diurutkan menurut tanggal, terbaru di atas.","Sắp xếp theo ngày, mới nhất ở trên."),
+ introh:L("把五管、AI、稅務與台積電，連起來。","把五管、AI、税务与台积电，连起来。","五つの管理機能、AI、税務、TSMCをつなぐ。","Menghubungkan lima fungsi manajemen, AI, pajak, dan TSMC.","Kết nối năm chức năng quản trị, AI, thuế và TSMC."),
+ introp:L("一座島一個主題，島上的建築是最新資訊。選一座島，走進它的城市風景；協作線會告訴你，這則新聞還牽動了哪幾座島。","一座岛一个主题，岛上的建筑是最新信息。选一座岛，走进它的城市风景；协作线会告诉你，这条新闻还牵动了哪几座岛。","島ごとに一つのテーマ、建物は最新情報です。島を選んでその街並みへ。関連線は、そのニュースがどの島に波及するかを示します。","Satu pulau satu tema; bangunannya adalah informasi terbaru. Pilih sebuah pulau dan masuki lanskapnya; garis relasi menunjukkan pulau mana saja yang terdampak oleh berita itu.","Mỗi đảo một chủ đề, các tòa nhà là thông tin mới nhất. Chọn một đảo để bước vào; đường liên kết cho thấy tin này còn tác động tới những đảo nào."),
+ cisl:L("座主題島","座主题岛","のテーマ島","pulau tema","đảo chủ đề"),citem:L("則最新資訊","条最新信息","件の最新情報","informasi terbaru","tin mới nhất"),
+ go:L("走進群島","走进群岛","群島へ","Masuk ke kepulauan","Vào quần đảo"),loading:L("正在組合群島…","正在组合群岛…","群島を組み立てています…","Menyusun kepulauan…","Đang ghép quần đảo…"),
+ related:L("相關島嶼","相关岛屿","関連する島","Pulau terkait","Đảo liên quan"),source:L("來源","来源","出典","Sumber","Nguồn"),
+ items:L("則資訊","条信息","件","item","mục")
+};
+
+/* ---------------- islands ---------------- */
+const ISL=[
+{id:"hub",kind:"campus",color:"#F2B8A2",ring:0,ang:0,
+ name:L("實踐國企","实践国企","実践国企","IBM Shih Chien","IBM Thực Tiễn"),
+ tag:L("群島總站","群岛总站","群島のハブ","Pusat kepulauan","Trung tâm quần đảo"),
+ desc:L("群島的中心站。這裡說明整個網站怎麼讀、資料從哪裡來、多久更新一次。五管指企業管理的五大機能：生產、行銷、人力資源、研發、財務。","群岛的中心站。这里说明整个网站怎么读、数据从哪里来、多久更新一次。五管指企业管理的五大职能：生产、营销、人力资源、研发、财务。","群島のハブ。サイトの読み方、データの出典、更新頻度を説明します。五管とは経営の五大機能、生産・マーケティング・人事・研究開発・財務です。","Pusat kepulauan. Menjelaskan cara membaca situs, sumber data, dan frekuensi pembaruan. Lima fungsi manajemen: produksi, pemasaran, SDM, R&D, keuangan.","Trung tâm quần đảo. Giải thích cách đọc trang, nguồn dữ liệu và tần suất cập nhật. Năm chức năng quản trị: sản xuất, tiếp thị, nhân sự, R&D, tài chính."),
+ items:[
+ {date:"2026-10-29",links:["tsmc","ai","tax"],
+  t:L("群島怎麼讀","群岛怎么读","群島の読み方","Cara membaca kepulauan","Cách đọc quần đảo"),
+  b:L("每座島一個主題，島上的建築代表最新資訊。點島開面板，協作線顯示跨主題的關係；清單與時間軸可換個角度看同一批資料。","每座岛一个主题，岛上的建筑代表最新信息。点岛开面板，协作线显示跨主题的关系；清单与时间轴可换个角度看同一批数据。","島ごとに一つのテーマ、建物が最新情報です。島をタップするとパネルが開き、関連線がテーマ間の関係を示します。一覧とタイムラインで同じデータを別の角度から見られます。","Setiap pulau satu tema; bangunan mewakili informasi terbaru. Ketuk pulau untuk membuka panel; garis relasi menunjukkan hubungan lintas tema. Daftar dan garis waktu menampilkan data yang sama dari sudut lain.","Mỗi đảo một chủ đề, các tòa nhà là tin mới nhất. Chạm đảo để mở bảng; đường liên kết thể hiện quan hệ giữa các chủ đề. Danh sách và dòng thời gian cho góc nhìn khác về cùng dữ liệu.")},
+ {date:"2026-10-29",links:["fin","hr"],
+  t:L("資料來源與更新","数据来源与更新","データ出典と更新","Sumber data dan pembaruan","Nguồn dữ liệu và cập nhật"),
+  b:L("資料整理自公開新聞與官方公告，截至2026年10月29日，每則附原始連結。五管指生產、行銷、人資、研發、財務五大企業管理機能。","数据整理自公开新闻与官方公告，截至2026年10月29日，每条附原始链接。五管指生产、营销、人资、研发、财务五大企业管理职能。","公開ニュースと公式発表から整理、2026年10月29日時点、各項目に出典リンク付き。五管とは生産・マーケティング・人事・研究開発・財務の五つの経営機能です。","Disusun dari berita publik dan pengumuman resmi per 29 Oktober 2026, setiap item memuat tautan sumber. Lima fungsi: produksi, pemasaran, SDM, R&D, keuangan.","Tổng hợp từ tin tức công khai và thông cáo chính thức đến ngày 29/10/2026, mỗi mục có liên kết nguồn. Năm chức năng: sản xuất, tiếp thị, nhân sự, R&D, tài chính.")}
+ ]},
+{id:"tsmc",kind:"fab",color:"#8FA9D6",ring:1,ang:0,
+ name:L("台積電財報","台积电财报","TSMC決算","Laporan Keuangan TSMC","Báo cáo tài chính TSMC"),
+ tag:L("2026年第三季法說會","2026年第三季度法说会","2026年第3四半期決算説明会","Konferensi hasil Q3 2026","Họp công bố kết quả Q3 2026"),
+ desc:L("台積電是全球最大晶圓代工廠，也是台灣經濟的風向球。這座島追蹤它每季財報與法說會：營收、毛利率、每股盈餘、資本支出與製程進度，以及牽動的供應鏈。","台积电是全球最大晶圆代工厂，也是台湾经济的风向标。这座岛追踪它每季财报与法说会：营收、毛利率、每股收益、资本支出与制程进度，以及牵动的供应链。","TSMCは世界最大のファウンドリで、台湾経済の指標でもあります。この島は四半期決算と説明会を追います。売上、粗利率、EPS、設備投資、プロセスの進捗、そして影響を受けるサプライチェーンです。","TSMC adalah pengecor wafer terbesar di dunia dan barometer ekonomi Taiwan. Pulau ini melacak laporan kuartalan dan konferensinya: pendapatan, margin kotor, EPS, belanja modal, kemajuan proses, dan rantai pasok yang terdampak.","TSMC là hãng gia công wafer lớn nhất thế giới và là phong vũ biểu của kinh tế Đài Loan. Đảo này theo dõi báo cáo quý và họp công bố: doanh thu, biên gộp, EPS, capex, tiến độ tiến trình và chuỗi cung ứng liên quan."),
+ items:[
+ {date:"2026-10-15",src:"優分析",url:"https://uanalyze.com.tw/articles/1564957177",links:["fin"],
+  t:L("第三季營收1兆4,942億元，EPS 29.43元創單季新高","第三季度营收1兆4,942亿元，EPS 29.43元创单季新高","第3四半期売上高1兆4,942億台湾ドル、EPS 29.43元で四半期最高","Pendapatan Q3 NT$1,494 triliun, EPS NT$29,43 rekor kuartalan","Doanh thu Q3 1.494 nghìn tỷ Đài tệ, EPS 29,43 Đài tệ cao kỷ lục"),
+  b:L("營收季增17.6%、年增50.9%，美元計467.2億美元超過財測上緣。毛利率66.4%、營業利益率58.7%，稅後純益7,630.6億元，年增68.7%。","营收季增17.6%、年增50.9%，美元计467.2亿美元超过财测上限。毛利率66.4%、营业利益率58.7%，税后净利7,630.6亿元，年增68.7%。","売上高は前期比17.6%増、前年比50.9%増。ドル建て467.2億ドルでガイダンス上限超え。粗利率66.4%、営業利益率58.7%、純利益7,630.6億元（前年比68.7%増）。","Pendapatan naik 17,6% QoQ dan 50,9% YoY; US$46,72 miliar melampaui batas atas panduan. Margin kotor 66,4%, margin operasi 58,7%, laba bersih NT$763,06 miliar (+68,7%).","Doanh thu tăng 17,6% so với quý trước và 50,9% so với cùng kỳ; 46,72 tỷ USD vượt trần dự báo. Biên lợi nhuận gộp 66,4%, biên hoạt động 58,7%, lãi ròng 763,06 tỷ Đài tệ (+68,7%).")},
+ {date:"2026-10-15",src:"NOWNEWS",url:"https://www.nownews.com/news/6883790",links:["fin","prod"],
+  t:L("第四季財測523至543億美元，全年美元營收成長上調至約44%","第四季度财测523至543亿美元，全年美元营收增长上调至约44%","第4四半期ガイダンス523〜543億ドル、通年成長率を約44%に上方修正","Panduan Q4 US$52,3–54,3 miliar; pertumbuhan setahun dinaikkan ke sekitar 44%","Dự báo Q4 52,3–54,3 tỷ USD; tăng trưởng cả năm nâng lên khoảng 44%"),
+  b:L("第四季毛利率指引65%至67%，資本支出維持600至640億美元，並預告2026至2028年資本支出將明顯高於過去三年。管理層稱AI需求未見放緩。","第四季度毛利率指引65%至67%，资本支出维持600至640亿美元，并预告2026至2028年资本支出将明显高于过去三年。管理层称AI需求未见放缓。","第4四半期の粗利率見通しは65〜67%、設備投資は600〜640億ドルを維持。2026〜2028年の投資は過去3年を大きく上回る見込み。経営陣はAI需要に減速なしと説明。","Margin kotor Q4 dipandu 65–67%; belanja modal tetap US$60–64 miliar, dan 2026–2028 akan jauh lebih tinggi dari tiga tahun sebelumnya. Manajemen menyebut permintaan AI belum melambat.","Biên gộp Q4 dự kiến 65–67%; capex giữ 60–64 tỷ USD và giai đoạn 2026–2028 sẽ cao hơn hẳn ba năm trước. Ban lãnh đạo nói nhu cầu AI chưa chậm lại.")},
+ {date:"2026-10-15",src:"股感",url:"https://www.stockfeel.com.tw/?p=277770",links:["rd","prod"],
+  t:L("2奈米貢獻晶圓營收8%，首度證實評估德州設廠","2纳米贡献晶圆营收8%，首度证实评估德州设厂","2nmがウエハー売上の8%、テキサス新工場の検討を初めて認める","Node 2nm menyumbang 8% pendapatan wafer; pabrik Texas pertama kali dikonfirmasi dalam evaluasi","Tiến trình 2nm chiếm 8% doanh thu wafer; lần đầu xác nhận đang đánh giá xây nhà máy ở Texas"),
+  b:L("2奈米量產爬坡是本季毛利率季減1.3個百分點的主因；7奈米以下製程占79%。公司已派團隊赴德州評估，並與SpaceX的Terafab計畫討論合作。海外廠稀釋預計未來擴大至3%至4%。","2纳米量产爬坡是本季度毛利率季减1.3个百分点的主因；7纳米以下制程占79%。公司已派团队赴德州评估，并与SpaceX的Terafab计划讨论合作。海外厂稀释预计未来扩大至3%至4%。","2nmの量産立ち上げが粗利率1.3ポイント低下の主因。7nm以下が79%。テキサスに調査団を派遣し、SpaceXのTerafab計画との協力も協議。海外工場による希薄化は今後3〜4%に拡大の見込み。","Ramp-up 2nm menjadi penyebab utama margin kotor turun 1,3 poin; node ≤7nm mencapai 79%. Tim telah dikirim ke Texas dan berdiskusi dengan proyek Terafab SpaceX. Dilusi pabrik luar negeri diperkirakan melebar ke 3–4%.","Việc tăng sản lượng 2nm là nguyên nhân chính khiến biên gộp giảm 1,3 điểm; tiến trình ≤7nm chiếm 79%. Đã cử đoàn tới Texas và thảo luận hợp tác với dự án Terafab của SpaceX. Pha loãng từ nhà máy nước ngoài dự kiến tăng lên 3–4%.")},
+ {date:"2026-10-26",src:"經濟日報",url:"https://money.udn.com/money/story/5607/9836957",links:["mkt","prod"],
+  t:L("折疊iPhone開賣即售罄，傳蘋果追加三成訂單","折叠iPhone开卖即售罄，传苹果追加三成订单","折りたたみiPhoneが発売即完売、Appleが3割増産要請と報道","iPhone lipat ludes saat peluncuran; Apple dilaporkan menambah pesanan 30%","iPhone gập cháy hàng ngay khi mở bán; Apple được cho là tăng đơn hàng 30%"),
+  b:L("蘋果首款折疊機iPhone Duo於10月23日開賣後迅速售罄，供應鏈傳出蘋果要求協力廠趕工並追加三成訂單，鴻海、台積電、新日興等可望受惠。","苹果首款折叠机iPhone Duo于10月23日开卖后迅速售罄，供应链传出苹果要求协力厂赶工并追加三成订单，鸿海、台积电、新日兴等可望受惠。","Apple初の折りたたみ機iPhone Duoは10月23日の発売後すぐに完売。サプライチェーンによると、Appleは増産と3割の追加発注を要請し、鴻海、TSMC、新日興などが恩恵を受ける見通し。","iPhone Duo, ponsel lipat pertama Apple, ludes segera setelah dijual 23 Oktober. Rantai pasok menyebut Apple meminta percepatan produksi dan tambahan pesanan 30%; Foxconn, TSMC, dan Shin Zu Shing diuntungkan.","iPhone Duo, máy gập đầu tiên của Apple, hết hàng ngay sau khi mở bán 23/10. Chuỗi cung ứng cho biết Apple yêu cầu tăng tốc và thêm 30% đơn hàng; Foxconn, TSMC, Shin Zu Shing hưởng lợi.")}
+ ]},
+{id:"ai",kind:"datacenter",color:"#B9A3E3",ring:1,ang:60,
+ name:L("AI動態","AI动态","AI動向","Dinamika AI","Động thái AI"),
+ tag:L("算力、模型與代理人","算力、模型与代理人","計算資源・モデル・エージェント","Komputasi, model, dan agen","Sức mạnh tính toán, mô hình và tác tử"),
+ desc:L("人工智慧正在改寫五管的每一個環節。這座島收錄AI晶片與算力、模型與雲端平台、代理人應用的最新動態，以及它們對企業經營與台灣供應鏈的影響。","人工智能正在改写五管的每一个环节。这座岛收录AI芯片与算力、模型与云平台、代理人应用的最新动态，以及它们对企业经营与台湾供应链的影响。","AIは経営機能のあらゆる段階を書き換えています。この島はAIチップと計算資源、モデルとクラウド基盤、エージェント応用の最新動向と、企業経営や台湾サプライチェーンへの影響を集めます。","AI sedang menulis ulang setiap mata rantai lima fungsi manajemen. Pulau ini memuat dinamika chip dan komputasi AI, model dan platform cloud, aplikasi agen, serta dampaknya pada bisnis dan rantai pasok Taiwan.","AI đang viết lại mọi mắt xích của năm chức năng quản trị. Đảo này thu thập động thái về chip và sức mạnh tính toán AI, mô hình và nền tảng đám mây, ứng dụng tác tử, cùng tác động tới doanh nghiệp và chuỗi cung ứng Đài Loan."),
+ items:[
+ {date:"2026-10-28",src:"科技新報",url:"https://technews.tw/2026/10/28/google-tpu-oracle-openai-procurement-challenges-nvidia-ai-dominance/",links:["rd","fin"],
+  t:L("OpenAI傳採購Google TPU，分散對輝達GPU依賴","OpenAI传采购Google TPU，分散对英伟达GPU依赖","OpenAIがGoogle TPU購入を計画、NVIDIA依存を分散と報道","OpenAI dilaporkan membeli TPU Google untuk mengurangi ketergantungan pada GPU Nvidia","OpenAI được cho là mua TPU của Google để giảm phụ thuộc vào GPU Nvidia"),
+  b:L("甲骨文宣布2027年將Google TPU導入OCI，是TPU首度進駐自家以外的超大規模雲端。OpenAI先前承諾2030年前花費約6,000億美元使用輝達伺服器，如今轉向多元供應，凸顯算力供應鏈分散化。","甲骨文宣布2027年将Google TPU导入OCI，是TPU首度进驻自家以外的超大规模云端。OpenAI先前承诺2030年前花费约6,000亿美元使用英伟达服务器，如今转向多元供应，凸显算力供应链分散化。","OracleはGoogle TPUを2027年にOCIへ導入すると発表、TPUが他社ハイパースケーラーに入るのは初。OpenAIは2030年までに約6,000億ドルをNVIDIAサーバーに投じると約束していたが、調達の多様化へ。","Oracle akan menghadirkan TPU Google di OCI pada 2027, pertama kalinya TPU masuk hyperscaler lain. OpenAI sebelumnya berkomitmen sekitar US$600 miliar untuk server Nvidia hingga 2030, kini mendiversifikasi pasokan komputasi.","Oracle công bố đưa TPU Google lên OCI năm 2027, lần đầu TPU vào một hyperscaler khác. OpenAI từng cam kết chi khoảng 600 tỷ USD cho máy chủ Nvidia đến 2030, nay đa dạng hóa nguồn cung.")},
+ {date:"2026-10-21",src:"方格子 AI週報",url:"https://vocus.cc/article/6adf6798fd897800011fa4ab",links:["prod"],
+  t:L("OpenAI前沿模型進駐Google Cloud Vertex AI，打破Azure獨家","OpenAI前沿模型进驻Google Cloud Vertex AI，打破Azure独家","OpenAIのフロンティアモデルがGoogle Cloud Vertex AIに登場、Azure独占が終わる","Model frontier OpenAI hadir di Google Cloud Vertex AI, mengakhiri eksklusivitas Azure","Mô hình tiên phong của OpenAI lên Google Cloud Vertex AI, chấm dứt độc quyền của Azure"),
+  b:L("GPT-6系列與Codex進入Vertex AI私有預覽，企業可透過IAM、標籤、預算卡控與零資料保留統一調用，降低跨雲整合與合規摩擦。同週Meta宣布950億美元AI基建融資。","GPT-6系列与Codex进入Vertex AI私有预览，企业可通过IAM、标签、预算管控与零数据保留统一调用，降低跨云整合与合规摩擦。同周Meta宣布950亿美元AI基建融资。","GPT-6シリーズとCodexがVertex AIの非公開プレビューに。IAM、ラベル、予算上限、ゼロデータ保持で統一的に利用でき、マルチクラウドの摩擦が減る。同週Metaは950億ドルのAIインフラ資金調達を発表。","Seri GPT-6 dan Codex masuk pratinjau privat Vertex AI; perusahaan dapat memanggilnya lewat IAM, label, batas anggaran, dan zero data retention, menekan friksi lintas cloud. Pekan yang sama Meta mengumumkan pendanaan infrastruktur AI US$95 miliar.","Dòng GPT-6 và Codex vào bản xem trước riêng của Vertex AI; doanh nghiệp gọi thống nhất qua IAM, nhãn, hạn mức ngân sách và không lưu dữ liệu, giảm ma sát đa đám mây. Cùng tuần Meta công bố huy động 95 tỷ USD cho hạ tầng AI.")},
+ {date:"2026-10-21",src:"Yahoo股市",url:"https://tw.stock.yahoo.com/news/%E9%BB%83%E4%BB%81%E5%8B%B3gtc%E5%A4%A7%E6%9C%83%E5%A0%B1%E6%98%8E%E7%89%8C-6%E5%8F%B0%E5%BB%A0%E5%85%A5%E5%88%97-%E6%96%B0%E6%AD%A6%E5%99%A8-%E4%BE%9B%E6%87%89%E9%8F%88-000000715.html",links:["prod","tsmc"],
+  t:L("輝達柏林GTC：Vera Rubin全面生產，DSX POD將AI工廠部署縮至14天","英伟达柏林GTC：Vera Rubin全面生产，DSX POD将AI工厂部署缩至14天","NVIDIAベルリンGTC：Vera Rubin本格生産、DSX PODでAI工場の構築を14日に短縮","GTC Berlin Nvidia: Vera Rubin produksi penuh, DSX POD memangkas pembangunan pabrik AI menjadi 14 hari","GTC Berlin của Nvidia: Vera Rubin sản xuất toàn diện, DSX POD rút thời gian triển khai nhà máy AI xuống 14 ngày"),
+  b:L("黃仁勳將運算、網路、供電與液冷預先整合於模組化貨櫃，部署時間從6個月縮至最快14天。鴻佰、雲達、緯創、技嘉、和碩、台達電六家台廠入列供應鏈。","黄仁勋将运算、网络、供电与液冷预先整合于模块化集装箱，部署时间从6个月缩至最快14天。鸿佰、云达、纬创、技嘉、和硕、台达电六家台厂入列供应链。","ジェンスン・フアンは計算、ネットワーク、電源、液冷をコンテナに事前統合し、構築期間を6か月から最短14日へ。鴻佰、雲達、緯創、技嘉、和碩、台達電の台湾6社がサプライチェーンに名を連ねた。","Jensen Huang mengintegrasikan komputasi, jaringan, daya, dan pendingin cair dalam kontainer modular, memangkas waktu dari 6 bulan menjadi 14 hari. Enam perusahaan Taiwan (Ingrasys, QCT, Wistron, Gigabyte, Pegatron, Delta) masuk rantai pasok.","Jensen Huang tích hợp sẵn tính toán, mạng, cấp điện và tản nhiệt lỏng trong container mô-đun, rút thời gian từ 6 tháng xuống nhanh nhất 14 ngày. Sáu hãng Đài Loan (Ingrasys, QCT, Wistron, Gigabyte, Pegatron, Delta) vào chuỗi cung ứng.")},
+ {date:"2026-10-26",src:"商傳媒",url:"https://tw.stock.yahoo.com/news/2026-10-26-%E5%95%86%E5%82%B3%E5%AA%92-ai%E7%94%A2%E6%A5%AD-040425288.html",links:["fin"],
+  t:L("一週大事：AWS每月30億美元買GPU，Anthropic逾600億美元算力債券","一周大事：AWS每月30亿美元买GPU，Anthropic逾600亿美元算力债券","週間まとめ：AWSは月30億ドルのGPU購入、Anthropicは600億ドル超の計算資源債","Rangkuman pekan: AWS beli GPU US$3 miliar per bulan; Anthropic obligasi komputasi lebih dari US$60 miliar","Tuần qua: AWS mua GPU 3 tỷ USD mỗi tháng; Anthropic phát hành trái phiếu tính toán hơn 60 tỷ USD"),
+  b:L("AWS自8月起每月斥資30億美元採購輝達GPU，並規劃近2,000億美元擴建基礎設施；輝達承諾在歐洲投入100億美元。同時OpenAI模型發現PHP存在十年的嚴重漏洞，約七成網站受影響。","AWS自8月起每月斥资30亿美元采购英伟达GPU，并规划近2,000亿美元扩建基础设施；英伟达承诺在欧洲投入100亿美元。同时OpenAI模型发现PHP存在十年的严重漏洞，约七成网站受影响。","AWSは8月から月30億ドルでNVIDIA GPUを購入し、約2,000億ドルのインフラ拡張を計画。NVIDIAは欧州に100億ドル投資を表明。一方、OpenAIのモデルがPHPに10年来の重大な脆弱性を発見し、約7割のサイトが影響。","AWS membeli GPU Nvidia US$3 miliar per bulan sejak Agustus dan merencanakan ekspansi infrastruktur hampir US$200 miliar; Nvidia berkomitmen US$10 miliar di Eropa. Model OpenAI juga menemukan celah PHP berusia sepuluh tahun yang memengaruhi sekitar 70% situs web.","AWS mua GPU Nvidia 3 tỷ USD mỗi tháng từ tháng 8 và dự kiến mở rộng hạ tầng gần 200 tỷ USD; Nvidia cam kết 10 tỷ USD tại châu Âu. Mô hình OpenAI còn phát hiện lỗ hổng PHP tồn tại mười năm, ảnh hưởng khoảng 70% website.")}
+ ]},
+{id:"tax",kind:"bank",color:"#F3D56B",ring:1,ang:120,
+ name:L("稅務","税务","税務","Pajak","Thuế"),
+ tag:L("財政部與國稅局最新動態","财政部与国税局最新动态","財政部・国税局の最新動向","Kemenkeu dan Kantor Pajak terkini","Bộ Tài chính và Cục Thuế mới nhất"),
+ desc:L("稅務是企業與個人都躲不開的成本。這座島整理財政部與國稅局的新規定：所得稅免稅額與級距、遺產與贈與稅、房地合一稅、稅收統計，以及申報時該注意的事。","税务是企业与个人都躲不开的成本。这座岛整理财政部与国税局的新规定：所得税免税额与级距、遗产与赠与税、房地合一税、税收统计，以及申报时该注意的事。","税務は企業にも個人にも避けられないコストです。この島は財政部と国税局の新しい規定をまとめます。所得税の控除と税率区分、相続税と贈与税、不動産合一税、税収統計、申告時の注意点です。","Pajak adalah biaya yang tak terhindarkan bagi perusahaan maupun individu. Pulau ini merangkum aturan baru Kemenkeu dan Kantor Pajak: bebas pajak dan lapisan tarif, pajak warisan dan hibah, pajak properti terpadu, statistik penerimaan, dan hal yang perlu diperhatikan saat melapor.","Thuế là chi phí mà doanh nghiệp lẫn cá nhân đều không tránh được. Đảo này tổng hợp quy định mới của Bộ Tài chính và Cục Thuế: mức miễn thuế và bậc thuế thu nhập, thuế thừa kế và tặng cho, thuế bất động sản hợp nhất, thống kê thu thuế và lưu ý khi kê khai."),
+ items:[
+ {date:"2026-10-12",src:"中時財富",url:"https://wantrich.chinatimes.com/news/20261012900004-420501",links:["fin"],
+  t:L("2027年遺產稅免稅額估1,488萬元、贈與稅272萬元，年底公告","2027年遗产税免税额估1,488万元、赠与税272万元，年底公告","2027年の相続税控除1,488万元・贈与税272万元の見込み、年末に告示","Bebas pajak warisan 2027 diperkirakan NT$14,88 juta, hibah NT$2,72 juta; diumumkan akhir tahun","Mức miễn thuế thừa kế 2027 ước 14,88 triệu Đài tệ, thuế tặng cho 2,72 triệu; công bố cuối năm"),
+  b:L("截至8月CPI較上次調整基準累計上漲11.61%，超過遺贈稅法10%的法定門檻。現行遺產稅免稅額1,333萬元、贈與稅每人每年244萬元，實際金額以財政部公告為準。","截至8月CPI较上次调整基准累计上涨11.61%，超过遗赠税法10%的法定门槛。现行遗产税免税额1,333万元、赠与税每人每年244万元，实际金额以财政部公告为准。","8月時点のCPIは前回調整基準から累計11.61%上昇し、法定の10%を超過。現行の相続税控除は1,333万元、贈与税は一人年244万元。確定額は財政部の告示による。","CPI hingga Agustus naik 11,61% dari basis penyesuaian terakhir, melampaui ambang 10% undang-undang. Saat ini bebas pajak warisan NT$13,33 juta dan hibah NT$2,44 juta per orang per tahun; angka final menunggu pengumuman Kemenkeu.","CPI đến tháng 8 tăng 11,61% so với mốc điều chỉnh trước, vượt ngưỡng 10% theo luật. Hiện mức miễn thuế thừa kế 13,33 triệu, thuế tặng cho 2,44 triệu mỗi người mỗi năm; con số chính thức chờ Bộ Tài chính công bố.")},
+ {date:"2026-10-14",src:"經濟日報",url:"https://udn.com/news/story/7243/9812777",links:["fin"],
+  t:L("9月個人房地合一稅44億元再翻黑，企業房地合一稅年減6.2%","9月个人房地合一税44亿元再翻黑，企业房地合一税年减6.2%","9月の個人不動産合一税は44億元で再び減少、法人は前年比6.2%減","Pajak properti terpadu individu September NT$4,4 miliar kembali turun; korporasi turun 6,2% YoY","Thuế bất động sản hợp nhất cá nhân tháng 9 đạt 4,4 tỷ Đài tệ, lại giảm; doanh nghiệp giảm 6,2% so với cùng kỳ"),
+  b:L("個人房地合一稅年減0.3%，企業實徵375億元為史上首次衰退。同月土增稅年增26.6%、契稅年增19.9%。前九月契稅年增9.9%，是房地三稅中唯一成長。","个人房地合一税年减0.3%，企业实征375亿元为史上首次衰退。同月土增税年增26.6%、契税年增19.9%。前九月契税年增9.9%，是房地三税中唯一增长。","個人は前年比0.3%減、法人は375億元で史上初の減少。同月の土地増値税は26.6%増、契約税は19.9%増。1〜9月の契約税は9.9%増で、不動産三税で唯一の増加。","Individu turun 0,3% YoY; korporasi NT$37,5 miliar, penurunan pertama dalam sejarah. Bulan yang sama pajak kenaikan nilai tanah naik 26,6% dan bea akta naik 19,9%. Januari–September bea akta naik 9,9%, satu-satunya yang tumbuh.","Cá nhân giảm 0,3%; doanh nghiệp thu 37,5 tỷ, lần đầu sụt giảm trong lịch sử. Cùng tháng thuế tăng giá đất tăng 26,6%, thuế trước bạ tăng 19,9%. Chín tháng đầu năm thuế trước bạ tăng 9,9%, khoản duy nhất tăng.")},
+ {date:"2025-11-27",src:"公視新聞",url:"https://news.pts.org.tw/article/783232",links:["hr"],
+  t:L("2026年度綜所稅免稅額10.1萬元、標準扣除額13.6萬元，2027年5月申報適用","2026年度综所税免税额10.1万元、标准扣除额13.6万元，2027年5月申报适用","2026年度の所得税基礎控除10.1万元・標準控除13.6万元、2027年5月申告から適用","Bebas pajak penghasilan 2026 NT$101.000, potongan standar NT$136.000, berlaku pelaporan Mei 2027","Miễn thuế thu nhập năm 2026 là 101.000 Đài tệ, khấu trừ tiêu chuẩn 136.000, áp dụng kỳ kê khai tháng 5/2027"),
+  b:L("薪資與身障特別扣除額提高至22.7萬元，5%稅率級距上限由59萬元升至61萬元。年所得64.4萬元以下的單身上班族可免稅；節能電器退貨物稅延長至2029年底。","薪资与身障特别扣除额提高至22.7万元，5%税率级距上限由59万元升至61万元。年所得64.4万元以下的单身上班族可免税；节能电器退货物税延长至2029年底。","給与・障害者特別控除は22.7万元に、5%税率の上限は59万元から61万元へ。年収64.4万元以下の単身会社員は非課税。省エネ家電の物品税還付は2029年末まで延長。","Potongan khusus gaji dan disabilitas naik ke NT$227.000; batas tarif 5% naik dari NT$590.000 ke NT$610.000. Pekerja lajang berpenghasilan di bawah NT$644.000 per tahun bebas pajak; rabat pajak komoditas peralatan hemat energi diperpanjang hingga akhir 2029.","Khấu trừ đặc biệt tiền lương và khuyết tật tăng lên 227.000; trần bậc 5% nâng từ 590.000 lên 610.000. Người độc thân thu nhập dưới 644.000/năm được miễn thuế; hoàn thuế hàng hóa cho thiết bị tiết kiệm năng lượng gia hạn tới cuối 2029.")}
+ ]},
+{id:"prod",kind:"factory",color:"#F5A25D",ring:1,ang:180,
+ name:L("生產與供應鏈","生产与供应链","生産・サプライチェーン","Produksi dan Rantai Pasok","Sản xuất và chuỗi cung ứng"),
+ tag:L("五管：生產管理","五管：生产管理","五管：生産管理","Lima fungsi: produksi","Năm chức năng: sản xuất"),
+ desc:L("生產與供應鏈管理，是把原料變成產品、再送到客戶手上的整個流程：產能規劃、採購、工廠布局、物流與庫存。這座島追蹤台灣製造業的擴產、缺料、漲價與海外設廠。","生产与供应链管理，是把原料变成产品、再送到客户手上的整个流程：产能规划、采购、工厂布局、物流与库存。这座岛追踪台湾制造业的扩产、缺料、涨价与海外设厂。","生産・サプライチェーン管理とは、原材料を製品にし顧客へ届けるまでの流れ全体です。生産能力計画、調達、工場配置、物流、在庫を含みます。この島は台湾製造業の増産、部材不足、値上げ、海外工場を追います。","Manajemen produksi dan rantai pasok adalah seluruh alur mengubah bahan baku menjadi produk hingga sampai ke pelanggan: perencanaan kapasitas, pengadaan, tata letak pabrik, logistik, dan persediaan. Pulau ini melacak ekspansi, kelangkaan, kenaikan harga, dan pabrik luar negeri manufaktur Taiwan.","Quản trị sản xuất và chuỗi cung ứng là toàn bộ quy trình biến nguyên liệu thành sản phẩm rồi đưa tới khách hàng: hoạch định công suất, mua hàng, bố trí nhà máy, logistics và tồn kho. Đảo này theo dõi mở rộng, thiếu hụt, tăng giá và nhà máy ở nước ngoài của ngành chế tạo Đài Loan."),
+ items:[
+ {date:"2026-10-22",src:"工商時報",url:"https://www.chinatimes.com/NEWSPAPERS/260202",links:["rd","fin"],
+  t:L("薄玻纖布、CCL 11月看漲10%至15%，PCB上游缺貨延燒","薄玻纤布、CCL 11月看涨10%至15%，PCB上游缺货延烧","薄型ガラスクロスとCCLが11月に10〜15%値上げ、PCB上流の品薄続く","Kain fiberglass tipis dan CCL naik 10–15% pada November; kelangkaan hulu PCB berlanjut","Vải sợi thủy tinh mỏng và CCL tăng 10–15% trong tháng 11; thiếu hụt thượng nguồn PCB kéo dài"),
+  b:L("上游材料缺貨推升新一波漲價並延燒至銅箔基板，供應鏈指出漲價可望11月生效。欣興指出AI帶動載板尺寸放大、層數增加，良率成為瓶頸。","上游材料缺货推升新一波涨价并延烧至覆铜板，供应链指出涨价可望11月生效。欣兴指出AI带动载板尺寸放大、层数增加，良率成为瓶颈。","上流材料の不足が新たな値上げを呼び、銅張積層板にも波及。11月に発効の見込み。欣興はAIで基板の大型化・多層化が進み、歩留まりがボトルネックと指摘。","Kelangkaan material hulu memicu gelombang kenaikan harga hingga laminasi tembaga; berlaku November. Unimicron menyebut AI memperbesar ukuran dan lapisan substrat sehingga yield menjadi hambatan.","Thiếu vật liệu thượng nguồn đẩy đợt tăng giá mới lan sang tấm phủ đồng, dự kiến hiệu lực tháng 11. Unimicron cho biết AI làm substrate lớn hơn, nhiều lớp hơn, tỷ lệ thành phẩm thành nút thắt.")},
+ {date:"2026-10-26",src:"中央社",url:"https://www.cna.com.tw/news/afe/202610260166.aspx",links:["fin"],
+  t:L("騰輝-KY泰國新廠啟用、2026年底量產，昆山同步擴產15億元","腾辉-KY泰国新厂启用、2026年底量产，昆山同步扩产15亿元","騰輝-KYがタイ新工場を稼働、2026年末量産へ、昆山も15億元で増産","Ventec-KY resmikan pabrik Thailand, produksi massal akhir 2026; Kunshan ekspansi NT$1,5 miliar","Ventec-KY khai trương nhà máy Thái Lan, sản xuất hàng loạt cuối 2026; Côn Sơn mở rộng 1,5 tỷ Đài tệ"),
+  b:L("騰輝電子在泰國大城府的東南亞首座生產基地啟用，鎖定AI高算力與高階電子材料；昆山廠擴產預計2027年第二季完成。東協快訊同週亦見金居馬來西亞高階銅箔新廠、聯茂中泰擴產。","腾辉电子在泰国大城府的东南亚首座生产基地启用，锁定AI高算力与高端电子材料；昆山厂扩产预计2027年第二季度完成。东盟快讯同周亦见金居马来西亚高端铜箔新厂、联茂中泰扩产。","騰輝電子はタイ・アユタヤに東南アジア初の生産拠点を開設し、AI向け高性能電子材料を狙う。昆山工場の増産は2027年第2四半期完了予定。同週、金居のマレーシア高級銅箔新工場や聯茂の中国・タイ増産も報じられた。","Ventec membuka basis produksi pertamanya di Asia Tenggara di Ayutthaya, Thailand, membidik material elektronik kelas AI; ekspansi Kunshan rampung Q2 2027. Pekan yang sama Co-Tech membangun pabrik foil tembaga di Malaysia dan ITEQ memperluas di China dan Thailand.","Ventec mở cơ sở sản xuất đầu tiên ở Đông Nam Á tại Ayutthaya, Thái Lan, nhắm vật liệu điện tử cao cấp cho AI; mở rộng Côn Sơn hoàn tất Q2/2027. Cùng tuần Co-Tech xây nhà máy lá đồng cao cấp ở Malaysia, ITEQ mở rộng ở Trung Quốc và Thái Lan.")},
+ {date:"2026-10-26",src:"經濟日報",url:"https://money.udn.com/money/story/5607/9836957",links:["ai","mkt"],
+  t:L("AI業搶貨，美國線航空貨運運價每公斤突破400元","AI业抢货，美国线航空货运运价每公斤突破400元","AI企業の争奪で米国向け航空貨物運賃が1kgあたり400元を突破","Perebutan kargo AI: tarif angkutan udara rute AS tembus NT$400 per kg","Doanh nghiệp AI tranh hàng, cước hàng không tuyến Mỹ vượt 400 Đài tệ/kg"),
+  b:L("美籍航空業者大舉調派包機來台搶運高科技產品，單月近百架次，急單運價短線漲逾一成、創今年新高，長榮航表示仍有調升空間。","美籍航空业者大举调派包机来台抢运高科技产品，单月近百架次，急单运价短线涨逾一成、创今年新高，长荣航表示仍有调升空间。","米系航空会社がチャーター便を大量投入して台湾からハイテク製品を輸送、月に100便近く。緊急便の運賃は短期で1割超上昇し今年最高、エバー航空はさらなる値上げ余地があると語る。","Maskapai AS mengerahkan hampir 100 penerbangan charter sebulan untuk mengangkut produk teknologi tinggi dari Taiwan; tarif pesanan mendesak naik lebih dari 10%, tertinggi tahun ini. EVA Air menyebut masih ada ruang kenaikan.","Các hãng hàng không Mỹ điều gần 100 chuyến thuê bao mỗi tháng tới Đài Loan chở hàng công nghệ cao; cước đơn gấp tăng hơn 10%, cao nhất năm. EVA Air nói vẫn còn dư địa tăng.")},
+ {date:"2026-10-22",src:"工商時報",url:"https://www.chinatimes.com/NEWSPAPERS/260202",links:["tsmc","rd"],
+  t:L("輝達攜矽品擴CPO光引擎產能，2027年中擴至15倍、2028年底30倍","英伟达携矽品扩CPO光引擎产能，2027年中扩至15倍、2028年底30倍","NVIDIAがSPILとCPO光エンジン能力を拡大、2027年中に15倍、2028年末に30倍","Nvidia dan SPIL perluas kapasitas mesin optik CPO: 15 kali pada pertengahan 2027, 30 kali akhir 2028","Nvidia cùng SPIL mở rộng năng lực quang CPO: gấp 15 lần giữa 2027, 30 lần cuối 2028"),
+  b:L("隨Vera Rubin平台與AI工廠加速部署，精密對位、耦合與測試設備需求升溫，台設備廠受惠。輝達同時宣布模組化資料中心方案，目標將部署時間從數月縮短至數天。","随Vera Rubin平台与AI工厂加速部署，精密对位、耦合与测试设备需求升温，台设备厂受惠。英伟达同时宣布模块化数据中心方案，目标将部署时间从数月缩短至数天。","Vera RubinプラットフォームとAI工場の展開加速で、精密アライメント・結合・試験装置の需要が高まり台湾装置メーカーに追い風。NVIDIAはモジュール型データセンターも発表し、構築を数か月から数日へ短縮を狙う。","Seiring percepatan Vera Rubin dan pabrik AI, permintaan peralatan penjajaran presisi, kopling, dan pengujian naik; produsen alat Taiwan diuntungkan. Nvidia juga meluncurkan pusat data modular untuk memangkas pembangunan dari bulan ke hari.","Khi nền tảng Vera Rubin và nhà máy AI tăng tốc, nhu cầu thiết bị căn chỉnh chính xác, ghép nối và kiểm thử tăng; nhà sản xuất thiết bị Đài Loan hưởng lợi. Nvidia cũng công bố trung tâm dữ liệu mô-đun, rút thời gian xây dựng từ vài tháng xuống vài ngày.")}
+ ]},
+{id:"mkt",kind:"market",color:"#F08A8A",ring:1,ang:240,
+ name:L("行銷","营销","マーケティング","Pemasaran","Tiếp thị"),
+ tag:L("五管：行銷管理","五管：营销管理","五管：マーケティング管理","Lima fungsi: pemasaran","Năm chức năng: tiếp thị"),
+ desc:L("行銷管理是找到顧客、說服顧客、留住顧客的學問：產品定位、定價、通路與推廣，現在還加上社群、數據與AI。這座島看品牌價值、新品上市與行銷工具的變化。","营销管理是找到顾客、说服顾客、留住顾客的学问：产品定位、定价、渠道与推广，现在还加上社群、数据与AI。这座岛看品牌价值、新品上市与营销工具的变化。","マーケティング管理は顧客を見つけ、説得し、つなぎとめる学問です。製品の位置づけ、価格、チャネル、プロモーションに加え、いまはSNS、データ、AIも含みます。この島はブランド価値、新製品発売、マーケティングツールの変化を見ます。","Manajemen pemasaran adalah ilmu menemukan, meyakinkan, dan mempertahankan pelanggan: positioning produk, harga, saluran, dan promosi, kini ditambah media sosial, data, dan AI. Pulau ini mengamati nilai merek, peluncuran produk baru, dan perubahan alat pemasaran.","Quản trị tiếp thị là cách tìm, thuyết phục và giữ chân khách hàng: định vị sản phẩm, giá, kênh và khuyến mãi, nay thêm mạng xã hội, dữ liệu và AI. Đảo này xem giá trị thương hiệu, ra mắt sản phẩm mới và thay đổi của công cụ tiếp thị."),
+ items:[
+ {date:"2026-10-23",src:"經濟日報",url:"https://money.udn.com/money/story/5607/9836957",links:["tsmc"],
+  t:L("iPhone Duo缺貨行銷：開賣即售罄，需求超過供給三成","iPhone Duo缺货营销：开卖即售罄，需求超过供给三成","iPhone Duoの品薄効果：発売即完売、需要は供給を3割上回る","Pemasaran kelangkaan iPhone Duo: ludes saat peluncuran, permintaan 30% di atas pasokan","Hiệu ứng khan hàng iPhone Duo: cháy hàng ngay khi mở bán, cầu vượt cung 30%"),
+  b:L("蘋果首款折疊機在官網與各通路同步開賣後售罄，追加三成訂單的消息本身就是最強的需求訊號，為年底購物季定調高階機種的稀缺敘事。","苹果首款折叠机在官网与各渠道同步开卖后售罄，追加三成订单的消息本身就是最强的需求信号，为年底购物季定调高端机型的稀缺叙事。","Apple初の折りたたみ機は公式サイトと各チャネルで同時完売。3割の追加発注という報道自体が最強の需要シグナルとなり、年末商戦の高級機の希少性ナラティブを決めた。","Ponsel lipat pertama Apple ludes serentak di situs resmi dan semua kanal; kabar tambahan pesanan 30% sendiri menjadi sinyal permintaan terkuat dan menetapkan narasi kelangkaan perangkat premium menjelang musim belanja.","Máy gập đầu tiên của Apple cháy hàng đồng loạt trên web chính thức và các kênh; tin tăng 30% đơn hàng tự nó là tín hiệu cầu mạnh nhất, định hình câu chuyện khan hiếm phân khúc cao cấp cho mùa mua sắm cuối năm.")},
+ {date:"2026-10-05",src:"方格子 AI週報",url:"https://vocus.cc/article/6acce73efd8978000100a831",links:["ai"],
+  t:L("OpenAI在ChatGPT試行對話原生廣告，依商業查詢動態展示","OpenAI在ChatGPT试行对话原生广告，依商业查询动态展示","OpenAIがChatGPTで会話型ネイティブ広告を試験、商用クエリに応じて表示","OpenAI uji iklan native percakapan di ChatGPT, tampil dinamis sesuai kueri komersial","OpenAI thử nghiệm quảng cáo gốc trong hội thoại ChatGPT, hiển thị theo truy vấn thương mại"),
+  b:L("廣告於免費版與Plus試行，引入對話成效評估與Apps SDK整合，並承諾維持回答客觀。對品牌而言，口碑佈局從「被人看見」延伸到「被AI引用」，生成式引擎優化（GEO）成為新戰場。","广告于免费版与Plus试行，引入对话成效评估与Apps SDK整合，并承诺维持回答客观。对品牌而言，口碑布局从「被人看见」延伸到「被AI引用」，生成式引擎优化（GEO）成为新战场。","無料版とPlusで試験、会話効果測定とApps SDK統合を導入し、回答の客観性維持を約束。ブランドにとって評判戦略は「人に見られる」から「AIに引用される」へ広がり、生成エンジン最適化（GEO）が新戦場に。","Iklan diuji di versi gratis dan Plus, dengan pengukuran efektivitas percakapan dan integrasi Apps SDK, sambil menjanjikan jawaban tetap objektif. Bagi merek, reputasi bergeser dari \"dilihat orang\" ke \"dikutip AI\"; Generative Engine Optimization (GEO) menjadi medan baru.","Quảng cáo thử nghiệm ở bản miễn phí và Plus, có đo hiệu quả hội thoại và tích hợp Apps SDK, cam kết giữ câu trả lời khách quan. Với thương hiệu, danh tiếng mở rộng từ \"được người thấy\" sang \"được AI trích dẫn\"; tối ưu công cụ sinh (GEO) thành chiến trường mới.")},
+ {date:"2026-01-05",src:"中央社",url:"https://www.cna.com.tw/postwrite/chi/423189",links:["rd"],
+  t:L("2025台灣最佳國際品牌總值151.49億美元創新高，華碩蟬聯榜首","2025台湾最佳国际品牌总值151.49亿美元创新高，华硕蝉联榜首","2025年台湾ベスト国際ブランド総額151.49億ドルで過去最高、ASUSが首位維持","Nilai 25 merek internasional terbaik Taiwan 2025 capai rekor US$15,149 miliar; ASUS tetap teratas","Tổng giá trị 25 thương hiệu quốc tế hàng đầu Đài Loan 2025 đạt kỷ lục 15,149 tỷ USD; ASUS giữ ngôi đầu"),
+  b:L("前25名總值年增2.7%，連續6年超過百億美元。聯發科以45%的品牌價值成長居漲幅之冠，致茂電子與東元電機為新進榜品牌，AI驅動的品牌差異化成為主軸。","前25名总值年增2.7%，连续6年超过百亿美元。联发科以45%的品牌价值增长居涨幅之冠，致茂电子与东元电机为新进榜品牌，AI驱动的品牌差异化成为主轴。","上位25社の総額は前年比2.7%増で6年連続100億ドル超。MediaTekはブランド価値45%増で伸び率トップ、Chroma ATEと東元電機が新規ランクイン。AI主導のブランド差別化が主軸に。","Total 25 besar naik 2,7% YoY, enam tahun berturut-turut di atas US$10 miliar. MediaTek memimpin pertumbuhan dengan 45%; Chroma ATE dan TECO masuk daftar baru. Diferensiasi merek berbasis AI menjadi tema utama.","Tổng 25 thương hiệu hàng đầu tăng 2,7%, sáu năm liên tiếp vượt 10 tỷ USD. MediaTek dẫn đầu mức tăng với 45%; Chroma ATE và TECO lần đầu vào bảng. Khác biệt hóa thương hiệu dựa trên AI là chủ đạo.")}
+ ]},
+{id:"hr",kind:"town",color:"#9FD3B4",ring:1,ang:300,
+ name:L("人力資源","人力资源","人事","Sumber Daya Manusia","Nhân sự"),
+ tag:L("五管：人力資源管理","五管：人力资源管理","五管：人事管理","Lima fungsi: SDM","Năm chức năng: nhân sự"),
+ desc:L("人力資源管理處理企業裡的人：招募、薪資、訓練、留才與勞資關係。這座島追蹤最低工資、勞動法規、人才流動，以及AI對工作方式的改變。","人力资源管理处理企业里的人：招募、薪资、训练、留才与劳资关系。这座岛追踪最低工资、劳动法规、人才流动，以及AI对工作方式的改变。","人事管理は企業の「人」を扱います。採用、給与、教育、定着、労使関係です。この島は最低賃金、労働法規、人材の流動、AIによる働き方の変化を追います。","Manajemen SDM menangani orang di dalam perusahaan: rekrutmen, gaji, pelatihan, retensi, dan hubungan industrial. Pulau ini melacak upah minimum, regulasi ketenagakerjaan, mobilitas talenta, dan perubahan cara kerja akibat AI.","Quản trị nhân sự xử lý con người trong doanh nghiệp: tuyển dụng, lương, đào tạo, giữ chân và quan hệ lao động. Đảo này theo dõi lương tối thiểu, pháp luật lao động, dịch chuyển nhân tài và thay đổi cách làm việc do AI."),
+ items:[
+ {date:"2026-09-24",src:"關鍵評論網",url:"https://www.thenewslens.com/article/270290",links:["fin","tax"],
+  t:L("2027年最低工資月薪30,900元、時薪205元，調幅4.745%","2027年最低工资月薪30,900元、时薪205元，调幅4.745%","2027年の最低賃金は月給30,900元・時給205元、4.745%引き上げ","Upah minimum 2027: NT$30.900 per bulan dan NT$205 per jam, naik 4,745%","Lương tối thiểu 2027: 30.900 Đài tệ/tháng và 205/giờ, tăng 4,745%"),
+  b:L("最低工資審議會9月24日從上午開到傍晚才拍板，月薪調升1,400元為近10年最高，連續第11年調漲，預估261萬名勞工受惠。待行政院核定後2027年1月1日實施，住宿餐飲與批發零售業首當其衝。","最低工资审议会9月24日从上午开到傍晚才拍板，月薪调升1,400元为近10年最高，连续第11年调涨，预估261万名劳工受惠。待行政院核定后2027年1月1日实施，住宿餐饮与批发零售业首当其冲。","最低賃金審議会は9月24日、朝から夕方まで協議して決定。月1,400元の引き上げは過去10年で最大、11年連続の増額で約261万人が対象。行政院の承認後、2027年1月1日施行。宿泊・飲食と卸売・小売への影響が大きい。","Dewan upah minimum memutuskan pada 24 September setelah berunding dari pagi hingga petang; kenaikan NT$1.400 per bulan adalah yang terbesar dalam sepuluh tahun, kenaikan ke-11 berturut-turut, sekitar 2,61 juta pekerja terdampak. Berlaku 1 Januari 2027 setelah disetujui Yuan Eksekutif; akomodasi, restoran, dan ritel paling terdampak.","Hội đồng lương tối thiểu chốt ngày 24/9 sau phiên họp từ sáng tới chiều; mức tăng 1.400 Đài tệ/tháng cao nhất mười năm, năm thứ 11 liên tiếp tăng, khoảng 2,61 triệu lao động hưởng lợi. Hiệu lực 1/1/2027 sau khi Hành chính viện phê duyệt; lưu trú, ăn uống và bán lẻ chịu tác động lớn nhất.")},
+ {date:"2026-09-24",src:"關鍵評論網",url:"https://www.thenewslens.com/article/270290",links:["fin"],
+  t:L("政院：中小企業轉型升級發展條例，2027年起每年250億元","政院：中小企业转型升级发展条例，2027年起每年250亿元","行政院：中小企業転換・高度化条例で2027年から毎年250億元","Yuan Eksekutif: UU transformasi UKM, NT$25 miliar per tahun mulai 2027","Hành chính viện: Luật chuyển đổi nâng cấp DNNVV, 25 tỷ Đài tệ mỗi năm từ 2027"),
+  b:L("卓榮泰指出最低工資自2016年20,008元升至2026年29,500元已連10年調升，政府將加速核定程序，並以每年250億元預算協助中小微型企業因應薪資與轉型壓力；勞動部將強化工會協商能力與勞動檢查。","卓荣泰指出最低工资自2016年20,008元升至2026年29,500元已连10年调升，政府将加速核定程序，并以每年250亿元预算协助中小微型企业因应薪资与转型压力；劳动部将强化工会协商能力与劳动检查。","卓榮泰行政院長は、最低賃金が2016年の20,008元から2026年の29,500元へ10年連続で上昇したと説明。承認手続きを加速し、年250億元の予算で中小零細企業の賃金・転換圧力を支援。労働部は労組の交渉力強化と労働監査を強める。","PM Cho Jung-tai menyebut upah minimum naik dari NT$20.008 (2016) ke NT$29.500 (2026) selama sepuluh tahun berturut-turut; pemerintah mempercepat persetujuan dan mengalokasikan NT$25 miliar per tahun untuk membantu UMKM menghadapi tekanan upah dan transformasi. Kemenaker memperkuat daya tawar serikat dan inspeksi.","Thủ tướng Trác Vinh Thái cho biết lương tối thiểu tăng từ 20.008 (2016) lên 29.500 (2026) trong mười năm liên tiếp; chính phủ đẩy nhanh phê duyệt và dành 25 tỷ Đài tệ mỗi năm giúp doanh nghiệp vừa, nhỏ và siêu nhỏ ứng phó áp lực lương và chuyển đổi. Bộ Lao động tăng năng lực thương lượng công đoàn và thanh tra.")},
+ {date:"2026-10-22",src:"中央社",url:"https://www.cna.com.tw/news/afe/202610223003.aspx",links:["fin"],
+  t:L("美光回應工會訴求獎酬升級，增季度分潤獎金結構調薪","美光回应工会诉求奖酬升级，增季度分润奖金结构调薪","マイクロンが労組の要求に応え報酬を見直し、四半期利益配分ボーナスを追加","Micron tanggapi tuntutan serikat: struktur bonus bagi hasil kuartalan dan penyesuaian gaji","Micron đáp ứng yêu cầu công đoàn: thêm thưởng chia lợi nhuận quý và điều chỉnh lương"),
+  b:L("記憶體景氣與AI需求推升半導體人力競逐，DIGITIMES同時報導美光擬自南韓延攬人才來台擴充戰力，人才市場的跨國流動成為人資議題核心。","存储景气与AI需求推升半导体人力竞逐，DIGITIMES同时报道美光拟自韩国延揽人才来台扩充战力，人才市场的跨国流动成为人资议题核心。","メモリー市況とAI需要で半導体人材の争奪が激化。DIGITIMESはマイクロンが韓国から人材を台湾へ引き抜き戦力を拡充する計画も報道、人材の国際移動が人事課題の中心に。","Siklus memori dan permintaan AI memanaskan perebutan talenta semikonduktor; DIGITIMES juga melaporkan Micron berencana merekrut talenta dari Korea Selatan ke Taiwan. Mobilitas talenta lintas negara menjadi inti isu SDM.","Chu kỳ bộ nhớ và nhu cầu AI làm nóng cuộc đua nhân lực bán dẫn; DIGITIMES cũng đưa tin Micron định tuyển nhân tài từ Hàn Quốc sang Đài Loan. Dịch chuyển nhân tài xuyên quốc gia thành trọng tâm nhân sự.")},
+ {date:"2026-10-01",src:"數位時代",url:"https://www.bnext.com.tw/article/90657/corp-app-ai100",links:["ai"],
+  t:L("麥肯錫：88%企業至少一項職能定期用AI，員工將成為AI團隊的協調者","麦肯锡：88%企业至少一项职能定期用AI，员工将成为AI团队的协调者","マッキンゼー：企業の88%が少なくとも1職能でAIを定期利用、社員はAIチームの調整役へ","McKinsey: 88% perusahaan rutin memakai AI di minimal satu fungsi; karyawan menjadi koordinator tim AI","McKinsey: 88% doanh nghiệp dùng AI thường xuyên ở ít nhất một chức năng; nhân viên thành người điều phối đội AI"),
+  b:L("三到四成企業已感受到AI帶來的成本下降。Google《2026 AI Agent趨勢》預測辦公室將由AI代理主導，招募篩選、客服、財務審計與資安等專門化AI應用正逐步接管工作流程。","三到四成企业已感受到AI带来的成本下降。Google《2026 AI Agent趋势》预测办公室将由AI代理主导，招募筛选、客服、财务审计与资安等专门化AI应用正逐步接管工作流程。","3〜4割の企業がAIによるコスト削減を実感。Googleの「2026 AIエージェント動向」はオフィスがAIエージェント主導になると予測し、採用選考、カスタマーサポート、財務監査、セキュリティの専門AIが業務フローを引き受けつつある。","30–40% perusahaan sudah merasakan penurunan biaya dari AI. Laporan Google \"Tren AI Agent 2026\" memprediksi kantor akan dipimpin agen AI; aplikasi AI khusus untuk rekrutmen, layanan pelanggan, audit keuangan, dan keamanan siber mengambil alih alur kerja.","30–40% doanh nghiệp đã thấy chi phí giảm nhờ AI. Báo cáo \"Xu hướng AI Agent 2026\" của Google dự đoán văn phòng sẽ do tác tử AI dẫn dắt; các ứng dụng AI chuyên biệt cho tuyển dụng, chăm sóc khách hàng, kiểm toán tài chính và an ninh mạng dần tiếp quản quy trình.")}
+ ]},
+{id:"rd",kind:"lab",color:"#86C5E8",ring:2,ang:90,
+ name:L("研發與技術","研发与技术","研究開発・技術","R&D dan Teknologi","R&D và công nghệ"),
+ tag:L("五管：研發管理","五管：研发管理","五管：研究開発管理","Lima fungsi: R&D","Năm chức năng: R&D"),
+ desc:L("研發管理是把技術變成競爭力：製程與產品開發、專利、產學合作、研發投入與回收。這座島看半導體先進製程、先進封裝與新材料的最新進展。","研发管理是把技术变成竞争力：制程与产品开发、专利、产学合作、研发投入与回收。这座岛看半导体先进制程、先进封装与新材料的最新进展。","研究開発管理は技術を競争力に変えることです。プロセスと製品の開発、特許、産学連携、研究開発投資と回収を含みます。この島は半導体の先端プロセス、先端パッケージング、新材料の進展を見ます。","Manajemen R&D mengubah teknologi menjadi daya saing: pengembangan proses dan produk, paten, kerja sama industri-akademik, investasi dan pengembalian R&D. Pulau ini mengamati kemajuan proses canggih, pengemasan canggih, dan material baru semikonduktor.","Quản trị R&D biến công nghệ thành năng lực cạnh tranh: phát triển tiến trình và sản phẩm, bằng sáng chế, hợp tác trường-viện, đầu tư và thu hồi R&D. Đảo này xem tiến bộ mới của tiến trình tiên tiến, đóng gói tiên tiến và vật liệu mới trong bán dẫn."),
+ items:[
+ {date:"2026-10-15",src:"股感",url:"https://www.stockfeel.com.tw/?p=277770",links:["tsmc"],
+  t:L("台積電A14製程2027年試產、2028年量產，N2家族2027年產能倍增","台积电A14制程2027年试产、2028年量产，N2家族2027年产能倍增","TSMCのA14は2027年試作・2028年量産、N2ファミリーは2027年に生産能力倍増","A14 TSMC uji produksi 2027, produksi massal 2028; kapasitas keluarga N2 berlipat dua pada 2027","A14 của TSMC thử sản xuất 2027, sản xuất hàng loạt 2028; năng lực dòng N2 tăng gấp đôi năm 2027"),
+  b:L("2026年公司服務534家客戶、採用305種製程技術、製造12,682種產品。先進製程占晶圓營收79%：3奈米33%、5奈米28%、7奈米10%、2奈米8%。","2026年公司服务534家客户、采用305种制程技术、制造12,682种产品。先进制程占晶圆营收79%：3纳米33%、5纳米28%、7纳米10%、2纳米8%。","2026年は534社の顧客に305種類のプロセスで12,682種の製品を製造。先端プロセスはウエハー売上の79%：3nm 33%、5nm 28%、7nm 10%、2nm 8%。","Pada 2026 perusahaan melayani 534 pelanggan dengan 305 teknologi proses dan 12.682 produk. Node canggih 79% pendapatan wafer: 3nm 33%, 5nm 28%, 7nm 10%, 2nm 8%.","Năm 2026 công ty phục vụ 534 khách hàng với 305 công nghệ tiến trình và 12.682 sản phẩm. Tiến trình tiên tiến chiếm 79% doanh thu wafer: 3nm 33%, 5nm 28%, 7nm 10%, 2nm 8%.")},
+ {date:"2026-10-15",src:"股感",url:"https://www.stockfeel.com.tw/?p=277770",links:["tsmc","prod"],
+  t:L("CoWoS 5X尺寸量產且良率優異，全球唯一；9X、14X開發中","CoWoS 5X尺寸量产且良率优异，全球唯一；9X、14X开发中","CoWoS 5Xレチクルを量産し歩留まり良好、世界唯一。9X・14Xは開発中","CoWoS ukuran 5X reticle diproduksi massal dengan yield unggul, satu-satunya di dunia; 9X dan 14X dalam pengembangan","CoWoS kích thước 5X reticle sản xuất hàng loạt với yield xuất sắc, duy nhất thế giới; 9X và 14X đang phát triển"),
+  b:L("先進封裝仍供不應求，CoWoS委外訂單陸續釋出，設備生產排程已規劃到2027年。法人估2026年資本支出的一部分用於擴建先進封裝與嘉義新廠。","先进封装仍供不应求，CoWoS委外订单陆续释出，设备生产排程已规划到2027年。法人估2026年资本支出的一部分用于扩建先进封装与嘉义新厂。","先端パッケージングは依然として供給不足で、CoWoSの外注が順次放出され、装置の生産計画は2027年まで埋まる。2026年の設備投資の一部は先端パッケージングと嘉義新工場の拡張に充てられる見込み。","Pengemasan canggih masih kekurangan pasokan; pesanan alih daya CoWoS terus dilepas, jadwal produksi alat sudah terisi hingga 2027. Sebagian belanja modal 2026 diperkirakan untuk ekspansi pengemasan canggih dan pabrik baru Chiayi.","Đóng gói tiên tiến vẫn cung không đủ cầu; đơn gia công CoWoS lần lượt được giao, lịch sản xuất thiết bị đã kín tới 2027. Một phần capex 2026 dự kiến dành mở rộng đóng gói tiên tiến và nhà máy mới ở Gia Nghĩa.")},
+ {date:"2026-10-28",src:"DIGITIMES",url:"https://www.digitimes.com.tw/tech/dt/n/shwnws.asp?id=0000772700_XZ28KGOKLJ893A1FRR6DB",links:["prod"],
+  t:L("景碩探索氮化鋁陶瓷載板核心，玻璃核心面臨脆性與可靠度挑戰","景硕探索氮化铝陶瓷载板核心，玻璃核心面临脆性与可靠度挑战","景碩が窒化アルミセラミックの基板コアを探索、ガラスコアは脆さと信頼性が課題","Kinsus jajaki inti substrat keramik aluminium nitrida; inti kaca hadapi tantangan kerapuhan dan keandalan","Kinsus thăm dò lõi substrate gốm nhôm nitrua; lõi thủy tinh gặp thách thức về độ giòn và độ tin cậy"),
+  b:L("景碩研發副總在TPCA Show指出，玻璃核心雖有材料優勢，但大型先進封裝需要另一條技術路線。英特爾技術長則稱與台積電的製程差距已縮至幾個百分點，但追上製造規模仍需時日。","景硕研发副总在TPCA Show指出，玻璃核心虽有材料优势，但大型先进封装需要另一条技术路线。英特尔技术长则称与台积电的制程差距已缩至几个百分点，但追上制造规模仍需时日。","景碩の研究開発担当副社長はTPCA Showで、ガラスコアには材料上の利点があるが大型先端パッケージには別の技術経路が必要と説明。インテルCTOはTSMCとのプロセス差は数ポイントに縮まったが、製造規模で追いつくには時間がかかると語った。","Wakil presiden R&D Kinsus di TPCA Show menyebut inti kaca punya keunggulan material, tetapi pengemasan canggih berukuran besar memerlukan jalur teknologi lain. CTO Intel menyatakan jarak proses dengan TSMC tinggal beberapa poin persen, namun menyamai skala manufaktur masih butuh waktu.","Phó tổng giám đốc R&D của Kinsus tại TPCA Show nói lõi thủy tinh có lợi thế vật liệu nhưng đóng gói tiên tiến cỡ lớn cần hướng công nghệ khác. CTO Intel cho rằng khoảng cách tiến trình với TSMC chỉ còn vài phần trăm, nhưng bắt kịp quy mô sản xuất còn lâu.")},
+ {date:"2026-10-21",src:"工商時報",url:"https://www.chinatimes.com/NEWSPAPERS/260202",links:["ai","tsmc"],
+  t:L("輝達與台積電共同開發COUPE製程的Spectrum-X CPO交換器進入量產","英伟达与台积电共同开发COUPE制程的Spectrum-X CPO交换器进入量产","NVIDIAとTSMCが共同開発したCOUPEプロセスのSpectrum-X CPOスイッチが量産入り","Switch CPO Spectrum-X berbasis proses COUPE kembangan Nvidia dan TSMC masuk produksi massal","Switch CPO Spectrum-X dùng tiến trình COUPE do Nvidia và TSMC đồng phát triển bước vào sản xuất hàng loạt"),
+  b:L("AI競賽從搶晶片延伸至搶光通訊產能，共同封裝光學與矽光子從技術驗證走向商業量產，台灣光通訊供應鏈迎來轉折。","AI竞赛从抢芯片延伸至抢光通信产能，共同封装光学与硅光子从技术验证走向商业量产，台湾光通信供应链迎来转折。","AI競争はチップから光通信の生産能力争奪へ拡大。コ・パッケージド・オプティクスとシリコンフォトニクスが技術検証から商業量産へ進み、台湾の光通信サプライチェーンは転換点を迎える。","Perlombaan AI meluas dari perebutan chip ke kapasitas komunikasi optik; co-packaged optics dan silicon photonics beralih dari validasi teknologi ke produksi komersial, titik balik bagi rantai pasok optik Taiwan.","Cuộc đua AI mở rộng từ tranh chip sang tranh năng lực quang; co-packaged optics và silicon photonics chuyển từ kiểm chứng kỹ thuật sang sản xuất thương mại, bước ngoặt cho chuỗi cung ứng quang Đài Loan.")}
+ ]},
+{id:"fin",kind:"tower",color:"#E9B86E",ring:2,ang:270,
+ name:L("財務與市場","财务与市场","財務・市場","Keuangan dan Pasar","Tài chính và thị trường"),
+ tag:L("五管：財務管理","五管：财务管理","五管：財務管理","Lima fungsi: keuangan","Năm chức năng: tài chính"),
+ desc:L("財務管理是替企業管錢：資金籌措、投資決策、現金流與財報解讀，並連到股市反應。這座島看獲利數字如何變成股價，以及AI投資熱潮的融資結構與風險。","财务管理是替企业管钱：资金筹措、投资决策、现金流与财报解读，并连到股市反应。这座岛看盈利数字如何变成股价，以及AI投资热潮的融资结构与风险。","財務管理は企業のお金を管理することです。資金調達、投資判断、キャッシュフロー、決算の読み方を扱い、株式市場の反応にもつながります。この島は利益がどう株価になるか、AI投資ブームの資金構造とリスクを見ます。","Manajemen keuangan mengelola uang perusahaan: penggalangan dana, keputusan investasi, arus kas, dan pembacaan laporan keuangan, terhubung ke reaksi pasar saham. Pulau ini melihat bagaimana laba menjadi harga saham serta struktur pendanaan dan risiko ledakan investasi AI.","Quản trị tài chính là quản lý tiền của doanh nghiệp: huy động vốn, quyết định đầu tư, dòng tiền và đọc báo cáo tài chính, nối tới phản ứng của thị trường chứng khoán. Đảo này xem lợi nhuận biến thành giá cổ phiếu ra sao, cùng cấu trúc tài trợ và rủi ro của làn sóng đầu tư AI."),
+ items:[
+ {date:"2026-10-15",src:"nStock",url:"https://www.nstock.tw/author/article?id=2348",links:["tsmc"],
+  t:L("法說當天台股重挫1,655.96點，台積電前三季EPS 78.75元","法说当天台股重挫1,655.96点，台积电前三季EPS 78.75元","決算説明会当日に台湾株は1,655.96ポイント急落、TSMCの1〜9月EPSは78.75元","Saham Taiwan anjlok 1.655,96 poin pada hari konferensi; EPS sembilan bulan TSMC NT$78,75","Chứng khoán Đài Loan giảm 1.655,96 điểm ngày họp công bố; EPS chín tháng của TSMC 78,75 Đài tệ"),
+  b:L("前三季累計稅後純益約2兆421億元、年增68.5%。法說前一晚ADR下跌3.4%，法說後第四季財測中值高於預期，但毛利率中值66%與對2027年消費市場的審慎態度，讓市場需要消化。","前三季度累计税后净利约2兆421亿元、年增68.5%。法说前一晚ADR下跌3.4%，法说后第四季度财测中值高于预期，但毛利率中值66%与对2027年消费市场的审慎态度，让市场需要消化。","1〜9月の純利益は約2兆421億元で前年比68.5%増。説明会前夜にADRは3.4%下落。第4四半期ガイダンスの中央値は予想を上回ったが、粗利率中央値66%と2027年の消費市場への慎重姿勢を市場は消化する必要がある。","Laba bersih sembilan bulan sekitar NT$2,0421 triliun, naik 68,5%. ADR turun 3,4% malam sebelum konferensi; titik tengah panduan Q4 di atas ekspektasi, tetapi margin kotor 66% dan sikap hati-hati terhadap pasar konsumen 2027 masih perlu dicerna pasar.","Lãi ròng chín tháng khoảng 2,0421 nghìn tỷ Đài tệ, tăng 68,5%. ADR giảm 3,4% đêm trước họp; trung vị dự báo Q4 vượt kỳ vọng, nhưng biên gộp trung vị 66% và thái độ thận trọng với thị trường tiêu dùng 2027 khiến thị trường cần thời gian tiêu hóa.")},
+ {date:"2026-10-26",src:"經濟日報",url:"https://udn.com/news/story/7251/9836554",links:["ai"],
+  t:L("AI泡沫疑慮再起，費半、韓股、台股高科技比重股市大幅壓回","AI泡沫疑虑再起，费半、韩股、台股高科技比重股市大幅压回","AIバブル懸念が再燃、SOX・韓国・台湾などハイテク比率の高い市場が大幅調整","Kekhawatiran gelembung AI muncul lagi; SOX, Korea, dan Taiwan yang berbobot teknologi terkoreksi tajam","Lo ngại bong bóng AI trở lại; SOX, Hàn Quốc và Đài Loan có tỷ trọng công nghệ cao điều chỉnh mạnh"),
+  b:L("市場焦點從資本支出規模轉向AI應用商業化與實質獲利。主動凱基台灣ETF經理人認為企業端訊號直接，台積電全年成長上調至44%、2026至2028年資本支出大幅高於過去三年，AI供應鏈不看淡。","市场焦点从资本支出规模转向AI应用商业化与实质获利。主动凯基台湾ETF经理人认为企业端信号直接，台积电全年增长上调至44%、2026至2028年资本支出大幅高于过去三年，AI供应链不看淡。","市場の焦点は設備投資の規模からAI応用の商業化と実質的な利益へ。凱基台湾アクティブETFのマネージャーは企業側のシグナルは明確で、TSMCの通年成長率44%への上方修正と2026〜28年の投資拡大から、AIサプライチェーンを弱気視しないと述べた。","Fokus pasar bergeser dari skala belanja modal ke komersialisasi AI dan laba riil. Manajer ETF aktif KGI Taiwan menilai sinyal korporasi jelas: TSMC menaikkan pertumbuhan tahunan ke 44% dan belanja modal 2026–2028 jauh lebih tinggi, sehingga rantai pasok AI tidak dipandang lemah.","Tâm điểm chuyển từ quy mô capex sang thương mại hóa AI và lợi nhuận thực. Quản lý ETF chủ động KGI Đài Loan cho rằng tín hiệu doanh nghiệp rõ ràng: TSMC nâng tăng trưởng cả năm lên 44% và capex 2026–2028 cao hơn hẳn, nên không bi quan về chuỗi cung ứng AI.")},
+ {date:"2026-10-28",src:"工商時報",url:"https://www.ctee.com.tw/news/20261028700733-430704",links:["ai"],
+  t:L("OpenAI下調估值至1.25兆美元，年化營收較預期短少200億美元","OpenAI下调估值至1.25兆美元，年化营收较预期短少200亿美元","OpenAIが評価額を1.25兆ドルに引き下げ、年換算売上は予想を200億ドル下回る","OpenAI pangkas valuasi ke US$1,25 triliun; pendapatan tahunan US$20 miliar di bawah proyeksi","OpenAI hạ định giá xuống 1,25 nghìn tỷ USD; doanh thu quy năm thấp hơn dự kiến 20 tỷ USD"),
+  b:L("AI支出憂慮與投資人需求轉冷，OpenAI一邊加速募資300億美元，一邊傳出轉向採購Google TPU；輝達先前承諾為其提供逾1,000億美元信貸支援。AI資本循環的融資結構成為財務觀察重點。","AI支出忧虑与投资人需求转冷，OpenAI一边加速募资300亿美元，一边传出转向采购Google TPU；英伟达先前承诺为其提供逾1,000亿美元信贷支持。AI资本循环的融资结构成为财务观察重点。","AI支出への懸念と投資家需要の冷え込みの中、OpenAIは300億ドルの資金調達を急ぐ一方でGoogle TPU購入に転じると報道。NVIDIAは以前1,000億ドル超の信用支援を約束していた。AI資本循環の資金構造が財務面の注目点に。","Di tengah kekhawatiran belanja AI dan minat investor yang mendingin, OpenAI mempercepat penggalangan US$30 miliar sambil dilaporkan beralih membeli TPU Google; Nvidia sebelumnya menjanjikan dukungan kredit lebih dari US$100 miliar. Struktur pendanaan siklus modal AI menjadi fokus pengamatan keuangan.","Giữa lo ngại chi tiêu AI và nhu cầu nhà đầu tư nguội đi, OpenAI vừa đẩy nhanh huy động 30 tỷ USD vừa được cho là chuyển sang mua TPU Google; Nvidia trước đó cam kết hỗ trợ tín dụng hơn 100 tỷ USD. Cấu trúc tài trợ của vòng quay vốn AI thành trọng tâm quan sát tài chính.")},
+ {date:"2026-01-13",src:"Focus Taiwan",url:"https://focustaiwan.tw/business/202601130030",links:["tax"],
+  t:L("2025年全國稅收3.75兆元，較預算短收505億元","2025年全国税收3.75兆元，较预算短收505亿元","2025年の全国税収は3.75兆元、予算を505億元下回る","Penerimaan pajak nasional 2025 NT$3,75 triliun, NT$50,5 miliar di bawah target","Thu thuế quốc gia 2025 đạt 3,75 nghìn tỷ Đài tệ, hụt 50,5 tỷ so với dự toán"),
+  b:L("淨稅收年減0.3%，營業稅、土增稅、貨物稅分別短收267億、209億與188億元。財政部歸因於美國關稅帶動消費者延後購車，以及央行信用管制壓抑房市交易。","净税收年减0.3%，营业税、土增税、货物税分别短收267亿、209亿与188亿元。财政部归因于美国关税带动消费者延后购车，以及央行信用管制压抑房市交易。","純税収は前年比0.3%減。営業税、土地増値税、物品税がそれぞれ267億、209億、188億元の不足。財政部は、米国関税による自動車購入の先送りと中央銀行の信用規制による不動産取引の低迷を理由に挙げた。","Penerimaan bersih turun 0,3%; pajak bisnis, pajak kenaikan nilai tanah, dan pajak komoditas masing-masing kurang NT$26,7 miliar, NT$20,9 miliar, dan NT$18,8 miliar. Kemenkeu menunjuk tarif AS yang menunda pembelian mobil dan kontrol kredit bank sentral yang menekan transaksi properti.","Thu ròng giảm 0,3%; thuế kinh doanh, thuế tăng giá đất và thuế hàng hóa lần lượt hụt 26,7 tỷ, 20,9 tỷ và 18,8 tỷ. Bộ Tài chính quy cho thuế quan Mỹ khiến người tiêu dùng hoãn mua xe và kiểm soát tín dụng của ngân hàng trung ương làm giảm giao dịch bất động sản.")}
+ ]}
+];
+
+/* ---------------- state ---------------- */
+let lang="tw";
+try{const s=localStorage.getItem("sc-lang");if(s&&UI.brand[s])lang=s;}catch(e){}
+const byId=Object.fromEntries(ISL.map(i=>[i.id,i]));
+const totalItems=ISL.reduce((n,i)=>n+i.items.length,0);
+document.getElementById("c-item").textContent=totalItems;
+document.getElementById("c-isl").textContent=ISL.length-1;
+const T=k=>UI[k][lang];
+
+function applyLang(){
+  document.documentElement.lang={tw:"zh-Hant",cn:"zh-Hans",ja:"ja",id:"id",vi:"vi"}[lang];
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=T(el.dataset.i)});
+  document.querySelectorAll(".lang button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.lang===lang)));
+  renderLegend();renderLog();renderList();renderTime();
+  ISL.forEach(i=>{const t=tagEls[i.id];if(t){t.firstChild.textContent=i.name[lang];t.lastChild.textContent=i.items.length+" "+T("items");}});
+  if(selected)openPanel(selected,false);
+}
+document.querySelectorAll(".lang button").forEach(b=>b.addEventListener("click",()=>{lang=b.dataset.lang;try{localStorage.setItem("sc-lang",lang)}catch(e){}applyLang();}));
+
+function renderLegend(){
+  document.getElementById("legend").innerHTML=ISL.filter(i=>i.id!=="hub").map(i=>`<span style="--c:${i.color}"><i></i>${i.name[lang]}</span>`).join("");
+}
+function allItems(){const a=[];ISL.forEach(i=>i.items.forEach(it=>a.push({isl:i,it})));a.sort((x,y)=>y.it.date.localeCompare(x.it.date));return a;}
+function renderLog(){
+  document.getElementById("log-body").innerHTML=allItems().map(({isl,it})=>`<div class="ln" style="--c:${isl.color}"><span class="d">${it.date.slice(5)}</span><button data-go="${isl.id}"><b>${isl.name[lang]}</b>${it.t[lang]}</button></div>`).join("");
+}
+function renderList(){
+  document.getElementById("list-grid").innerHTML=ISL.map(i=>`<div class="card" style="--c:${i.color}"><h3>${i.name[lang]}</h3><div class="n">${i.tag[lang]} · ${i.items.length} ${T("items")}</div><p class="cd">${i.desc[lang]}</p><ul>${i.items.map(it=>`<li><span class="d">${it.date.slice(5)}</span><button data-go="${i.id}">${it.t[lang]}</button></li>`).join("")}</ul></div>`).join("");
+}
+function renderTime(){
+  document.getElementById("tl").innerHTML=allItems().map(({isl,it})=>`<div class="row" style="--c:${isl.color}"><span class="d">${it.date}</span><div class="t"><span class="isl">${isl.name[lang]}</span><button data-go="${isl.id}"><b>${it.t[lang]}</b></button></div></div>`).join("");
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(!b)return;setView("3d");focusIsland(b.dataset.go);});
+
+/* ---------------- panel ---------------- */
+let selected=null;
+const panel=document.getElementById("panel");
+function openPanel(id,fly=true){
+  const isl=byId[id];selected=id;
+  panel.style.setProperty("--c",isl.color);
+  document.getElementById("p-title").textContent=isl.name[lang];
+  document.getElementById("p-sub").textContent=isl.tag[lang];
+  document.getElementById("p-body").innerHTML=`<p class="desc">${isl.desc[lang]}</p>`+isl.items.map(it=>`<article class="item">
+    <div class="meta"><span class="d">${it.date}</span>${it.src?`<span>${it.src}</span>`:""}</div>
+    <h3>${it.t[lang]}</h3><p>${it.b[lang]}</p>
+    ${it.links&&it.links.length?`<div class="links"><span class="src">${T("related")}</span>${it.links.map(l=>`<button data-go="${l}" style="--c:${byId[l].color}">${byId[l].name[lang]}</button>`).join("")}</div>`:""}
+    ${it.url?`<div class="src">${T("source")}：<a href="${it.url}" target="_blank" rel="noopener">${it.src||it.url}</a></div>`:""}
+  </article>`).join("");
+  panel.classList.add("open");
+  document.getElementById("hint").classList.add("off");
+  highlight(id);
+}
+document.getElementById("p-close").addEventListener("click",()=>{panel.classList.remove("open");selected=null;highlight(null);});
+
+/* ---------------- views & modes ---------------- */
+let view="3d";
+function setView(v){view=v;document.querySelectorAll("[data-view]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.view===v)));
+  document.getElementById("view-list").hidden=v!=="list";document.getElementById("view-time").hidden=v!=="time";}
+document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
+const modes={tags:true,lines:true,pause:false,bird:false,log:false};
+function toggle(id){modes[id]=!modes[id];document.getElementById("m-"+id).setAttribute("aria-pressed",String(modes[id]));
+  if(id==="lines")lineGroup.visible=modes.lines;
+  if(id==="log")document.getElementById("log").classList.toggle("open",modes.log);
+  if(id==="tags")Object.values(tagEls).forEach(t=>t.classList.toggle("on",modes.tags));
+  if(id==="bird")cam.targetPhi=modes.bird?0.18:1.05;
+}
+["tags","lines","pause","bird","log"].forEach(id=>document.getElementById("m-"+id).addEventListener("click",()=>toggle(id)));
+
+/* ---------------- three.js ---------------- */
+const isDark=()=>document.documentElement.dataset.theme==="dark"||(!document.documentElement.dataset.theme&&matchMedia("(prefers-color-scheme: dark)").matches);
+const stage=document.getElementById("stage");
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+stage.appendChild(renderer.domElement);
+renderer.domElement.style.width="100%";renderer.domElement.style.height="100%";
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(44,1,0.1,500);
+const cam={theta:0.6,phi:1.05,r:36,targetPhi:1.05,targetR:36,tx:0,tz:0,ttx:0,ttz:0,auto:true};
+const hemi=new THREE.HemisphereLight(0xfff7ea,0x3b7ea8,0.75);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff1d6,1.6);sun.position.set(22,34,12);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-34,right:34,top:34,bottom:-34,near:1,far:100});sun.shadow.bias=-0.0005;scene.add(sun);
+const fill=new THREE.DirectionalLight(0xbfe6ff,0.35);fill.position.set(-20,12,-16);scene.add(fill);
+
+/* palette: policy-island family — blue sea, terracotta accent, cream buildings, strong dark outlines on UI */
+const SEA_L=0x1f6fb2, SEA_D=0x12355c, SKY_L=0xbfe3fb, SKY_D=0x1b2740;
+const SAND=0xf2d6a2, GRASS=0x8fcf5a, GRASS2=0x6bb64a, CREAM=0xfff8ec, ROOF=0xdb6a41, DARK=0x3a2e2a, WOOD=0x9a6b4f, LEAF=0x4fae5a;
+function mat(c,r=.9){const m=new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:0});m.color.convertSRGBToLinear();return m;}
+
+/* sea */
+const water=new THREE.Mesh(new THREE.CircleGeometry(220,80),(()=>{const m=new THREE.MeshStandardMaterial({color:SEA_L,roughness:.55,metalness:.05});m.color.convertSRGBToLinear();return m;})());
+water.rotation.x=-Math.PI/2;water.position.y=-0.9;water.receiveShadow=true;scene.add(water);
+const foamMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.35});
+const rings=[];for(let i=0;i<22;i++){const r=new THREE.Mesh(new THREE.RingGeometry(1.0,1.18,32),foamMat.clone());r.rotation.x=-Math.PI/2;r.position.set((Math.random()-.5)*80,-0.85,(Math.random()-.5)*80);r.userData.s=Math.random()*6;rings.push(r);scene.add(r);}
+
+/* distant green mountains */
+const mountains=new THREE.Group();scene.add(mountains);
+(function(){const rnd=seeded(3);for(let i=0;i<26;i++){const a=i/26*Math.PI*2+rnd()*.2;const d=78+rnd()*22;const h=10+rnd()*14,w=14+rnd()*14;
+  const g=new THREE.ConeGeometry(w,h,7);const shade=[0x3f9a5f,0x4caa6a,0x5bb875,0x3a8d58][i%4];const m=new THREE.Mesh(g,mat(shade,1));m.position.set(Math.cos(a)*d,h/2-1.2,Math.sin(a)*d);m.rotation.y=rnd()*6;mountains.add(m);
+  if(h>20){const cap=new THREE.Mesh(new THREE.ConeGeometry(w*.28,h*.28,7),mat(0xffffff,1));cap.position.set(m.position.x,h-1.2-h*.14,m.position.z);cap.rotation.y=m.rotation.y;mountains.add(cap);}}
+  for(let i=0;i<18;i++){const a=i/18*Math.PI*2+.1;const d=110+rnd()*25;const h=18+rnd()*22,w=24+rnd()*18;const m=new THREE.Mesh(new THREE.ConeGeometry(w,h,6),mat(0x2f7a4e,1));m.position.set(Math.cos(a)*d,h/2-1.2,Math.sin(a)*d);mountains.add(m);}
+})();
+/* clouds */
+const clouds=new THREE.Group();scene.add(clouds);
+for(let i=0;i<10;i++){const c=new THREE.Group();const n=3+Math.floor(Math.random()*3);for(let j=0;j<n;j++){const s=new THREE.Mesh(new THREE.SphereGeometry(1.2+Math.random()*1.4,10,8),mat(0xffffff,1));s.position.set(j*1.6-n*.8,Math.random()*.5,Math.random()*.8);c.add(s);}
+  c.position.set((Math.random()-.5)*120,16+Math.random()*8,(Math.random()-.5)*120);c.userData.v=.4+Math.random()*.5;clouds.add(c);}
+
+function applyTheme(){const d=isDark();scene.background=new THREE.Color(d?SKY_D:SKY_L);scene.fog=new THREE.Fog(d?SKY_D:SKY_L,120,260);
+  hemi.intensity=d?.45:.75;sun.intensity=d?1.0:1.6;sun.color.set(d?0xffc890:0xfff1d6);water.material.color.set(d?SEA_D:SEA_L).convertSRGBToLinear();
+  clouds.children.forEach(c=>c.children.forEach(s=>s.material.color.set(d?0x8e9ab5:0xffffff)));}
+
+const islandGroup=new THREE.Group();scene.add(islandGroup);
+const lineGroup=new THREE.Group();scene.add(lineGroup);
+const meshes=[];const tagEls={};
+function box(w,h,d,c,x,y,z,g){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c));m.position.set(x,y+h/2,z);m.castShadow=m.receiveShadow=true;g.add(m);return m;}
+function cyl(rt,rb,h,c,x,y,z,g,seg=16){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat(c));m.position.set(x,y+h/2,z);m.castShadow=m.receiveShadow=true;g.add(m);return m;}
+function sph(r,c,x,y,z,g){const m=new THREE.Mesh(new THREE.SphereGeometry(r,14,10),mat(c));m.position.set(x,y,z);m.castShadow=true;g.add(m);return m;}
+function tree(x,z,g,s=1){cyl(.08*s,.1*s,.35*s,WOOD,x,0,z,g,8);const c=sph(.42*s,LEAF,x,.75*s,z,g);c.scale.y=1.2;const c2=sph(.3*s,0x6fc96f,x+.15*s,1.05*s,z-.1*s,g);}
+function seeded(n){let s=n*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280;};}
+const SKIN=0xffd9b3, SHIRTS=[0xdb6a41,0x2f86c7,0xf7c948,0x4fae5a,0xe06c9f,0x8b6bd1];
+/* cute person: round head, capsule body, little feet; returns group with walk animation data */
+function person(x,z,g,col,rnd){const p=new THREE.Group();const body=cyl(.13,.16,.3,col,0,0.12,0,p,10);const head=sph(.15,SKIN,0,.56,0,p);const hair=sph(.15,[0x3a2e2a,0x6b4a2b,0xc98b3a][Math.floor(rnd()*3)],0,.6,0,p);hair.scale.set(1,.65,1);
+  const e1=sph(.025,0x222222,-.06,.56,.13,p),e2=sph(.025,0x222222,.06,.56,.13,p);
+  cyl(.045,.045,.12,DARK,-.07,0,0,p,6);cyl(.045,.045,.12,DARK,.07,0,0,p,6);
+  p.position.set(x,0.5,z);p.userData.walk={r:.45+rnd()*.9,a:rnd()*6.28,cx:x,cz:z,sp:.6+rnd()*.6,ph:rnd()*6};g.add(p);return p;}
+/* cute car */
+function car(g,col){const c=new THREE.Group();box(.7,.22,.4,col,0,0,0,c);box(.42,.2,.36,CREAM,-.04,.22,0,c);
+  [[-.22,.2],[.22,.2],[-.22,-.2],[.22,-.2]].forEach(([x,z])=>{const w=cyl(.1,.1,.08,DARK,x,0,z,c,10);w.rotation.x=Math.PI/2;w.position.y=.05;});
+  sph(.04,0xfff2a8,.36,.1,.12,c);sph(.04,0xfff2a8,.36,.1,-.12,c);c.position.y=.5;g.add(c);return c;}
+/* cute boat */
+function boat(col){const b=new THREE.Group();const hull=box(1.6,.35,.7,col,0,0,0,b);const bow=new THREE.Mesh(new THREE.ConeGeometry(.35,.6,4),mat(col));bow.rotation.z=-Math.PI/2;bow.rotation.x=Math.PI/4;bow.position.set(1.05,.17,0);bow.castShadow=true;b.add(bow);
+  box(.7,.3,.5,CREAM,-.2,.35,0,b);box(.4,.25,.4,CREAM,-.1,.65,0,b);cyl(.07,.07,.3,ROOF,.25,.9,0,b,8);const flag=box(.3,.18,.03,0xf7c948,.4,1.2,0,b);flag.userData.flag=true;
+  person(-.6,0,b,SHIRTS[1],seeded(9)).userData.walk=null;b.position.y=-.55;return b;}
+/* cute plane with banner */
+function plane(){const p=new THREE.Group();const body=cyl(.18,.3,1.8,CREAM,0,0,0,p,12);body.rotation.z=Math.PI/2;body.position.y=0;const nose=sph(.3,ROOF,.9,0,0,p);
+  box(.5,.06,2.4,0xf7c948,.1,0,0,p);box(.35,.06,.9,0xf7c948,-.85,.1,0,p);box(.1,.4,.08,ROOF,-.85,.1,0,p);
+  const prop=box(.06,.9,.08,DARK,1.2,0,0,p);prop.userData.prop=true;const pilot=person(.1,0,p,SHIRTS[0],seeded(5));pilot.userData.walk=null;pilot.position.y=.1;pilot.scale.set(.8,.8,.8);
+  const banner=box(2.6,.55,.02,0xfff8ec,-3.2,.1,0,p);banner.userData.banner=true;
+  const cv=document.createElement("canvas");cv.width=512;cv.height=108;const cx=cv.getContext("2d");cx.fillStyle="#fff8ec";cx.fillRect(0,0,512,108);cx.fillStyle="#db6a41";cx.font="bold 56px 'M PLUS Rounded 1c','Noto Sans TC',sans-serif";cx.textAlign="center";cx.textBaseline="middle";cx.fillText("實踐國企群島",256,56);
+  const tex=new THREE.CanvasTexture(cv);const bm=new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide});const bp=new THREE.Mesh(new THREE.PlaneGeometry(2.6,.55),bm);bp.position.set(-3.2,.38,.02);p.add(bp);const bp2=bp.clone();bp2.position.z=-.02;bp2.rotation.y=Math.PI;p.add(bp2);banner.visible=false;
+  cyl(.015,.015,1.6,DARK,-1.6,.38,0,p,4).rotation.z=Math.PI/2;return p;}
+
+function buildIsland(isl,idx){
+  const g=new THREE.Group();const rnd=seeded(idx+7);
+  const base=cyl(3.55,3.95,1.0,SAND,0,-1.0,0,g,6);base.rotation.y=Math.PI/6;
+  const cliff=cyl(3.4,3.55,.35,0xd9b57f,0,-.35,0,g,6);cliff.rotation.y=Math.PI/6;
+  const top=cyl(3.15,3.15,.45,GRASS,0,0,0,g,6);top.rotation.y=Math.PI/6;
+  // ring road
+  const road=new THREE.Mesh(new THREE.RingGeometry(2.35,2.75,48),mat(0xe9e2d3,1));road.rotation.x=-Math.PI/2;road.position.y=.46;road.receiveShadow=true;g.add(road);
+  const accent=new THREE.Color(isl.color).getHex();
+  const k=isl.kind;
+  if(k==="campus"){box(2.2,1.1,1.1,CREAM,0,.5,0,g);const roof=new THREE.Mesh(new THREE.ConeGeometry(1.7,.8,4),mat(ROOF));roof.rotation.y=Math.PI/4;roof.position.set(0,2.0,0);roof.castShadow=true;g.add(roof);
+    cyl(.08,.08,1.6,DARK,1.5,.5,-.7,g,6);const flag=box(.6,.35,.04,accent,1.8,1.7,-.7,g);flag.userData.flag=true;box(.9,.5,.7,CREAM,-1.5,.5,.9,g);tree(-1.7,-1.1,g);tree(1.5,1.3,g,.8);}
+  if(k==="fab"){box(2.4,.8,1.5,CREAM,-.3,.5,0,g);box(1.1,1.3,1.1,accent,1.4,.5,-.5,g);[-.9,-.3,.3].forEach(x=>cyl(.12,.12,.7,DARK,x,1.3,.3,g,8));box(.5,.5,.5,DARK,1.4,1.8,-.5,g);box(1.0,.35,1.0,CREAM,-1.2,.5,1.3,g);tree(1.9,1.2,g,.7);}
+  if(k==="datacenter"){for(let i=0;i<4;i++)box(.55,1.2+i*.35,.55,i%2?accent:CREAM,-1.2+i*.75,.5,0,g);cyl(.06,.06,2.2,DARK,1.7,.5,-1.1,g,6);const dish=new THREE.Mesh(new THREE.SphereGeometry(.42,12,8,0,Math.PI*2,0,Math.PI/2),mat(CREAM));dish.position.set(1.7,2.7,-1.1);dish.rotation.x=Math.PI;dish.castShadow=true;g.add(dish);box(1.5,.5,.9,CREAM,0,.5,1.4,g);tree(-1.9,1.3,g,.8);}
+  if(k==="bank"){box(2.3,.3,1.5,CREAM,0,.5,0,g);[-.85,-.28,.28,.85].forEach(x=>cyl(.12,.12,1.1,CREAM,x,.8,.55,g,10));box(2.5,.35,1.7,accent,0,1.9,0,g);const ped=new THREE.Mesh(new THREE.ConeGeometry(1.25,.5,4),mat(ROOF));ped.rotation.y=Math.PI/4;ped.position.set(0,2.5,0);ped.castShadow=true;g.add(ped);const coin=cyl(.45,.45,.12,0xf7c948,-1.8,.5,1.2,g,20);coin.rotation.x=Math.PI/2;coin.position.y=.95;coin.userData.spin=true;tree(1.9,1.2,g,.8);}
+  if(k==="factory"){box(2.3,.9,1.3,CREAM,-.2,.5,.2,g);for(let i=0;i<3;i++){const s=new THREE.Mesh(new THREE.ConeGeometry(.5,.6,4),mat(ROOF));s.rotation.y=Math.PI/4;s.position.set(-1.0+i*.8,1.7,.2);s.castShadow=true;g.add(s);}cyl(.18,.22,1.9,DARK,1.5,.5,-.7,g,10);cyl(.2,.2,.15,accent,1.5,2.4,-.7,g,10);box(.9,.5,1.1,accent,-1.8,.5,-1.0,g);box(.5,.5,.5,0xd9a066,1.7,.5,1.1,g);box(.5,.5,.5,0xd9a066,1.2,.5,1.4,g);}
+  if(k==="market"){box(2.1,.7,1.2,CREAM,0,.5,0,g);box(2.3,.12,1.4,ROOF,0,1.2,.1,g);for(let i=0;i<4;i++)box(.3,.12,1.4,CREAM,-.9+i*.6,1.21,.1,g);cyl(.06,.06,1.6,DARK,-1.6,.5,-1.0,g,6);const bal=sph(.32,accent,-1.6,2.3,-1.0,g);bal.userData.bob=true;box(.6,.6,.6,0xf7c948,1.5,.5,.8,g);cyl(.3,.3,.4,accent,1.4,.5,-1.1,g,12);tree(-1.2,1.4,g,.8);}
+  if(k==="town"){const hs=[[-1.2,-.6],[0,-.9],[1.2,-.5],[-.8,.9],[.9,1.0]];hs.forEach(([x,z],i)=>{box(.8,.6,.8,i%2?CREAM:accent,x,.5,z,g);const r=new THREE.Mesh(new THREE.ConeGeometry(.62,.5,4),mat(i%2?accent:ROOF));r.rotation.y=Math.PI/4;r.position.set(x,1.35,z);r.castShadow=true;g.add(r);});tree(0,.1,g,.5);}
+  if(k==="lab"){box(1.8,.8,1.3,CREAM,-.6,.5,.2,g);cyl(.8,.8,.5,CREAM,1.2,.5,-.3,g,16);const dome=new THREE.Mesh(new THREE.SphereGeometry(.8,16,12,0,Math.PI*2,0,Math.PI/2),mat(accent));dome.position.set(1.2,1.0,-.3);dome.castShadow=true;g.add(dome);cyl(.12,.12,1.4,DARK,-1.5,1.3,-.6,g,8);const bulb=sph(.22,0xf7c948,-1.5,2.85,-.6,g);bulb.userData.glow=true;box(.4,.4,.4,accent,.2,.5,1.4,g);tree(1.9,1.2,g,.8);}
+  if(k==="tower"){box(1.0,2.6,1.0,CREAM,-.5,.5,-.3,g);box(.9,1.8,.9,accent,.8,.5,.4,g);box(1.1,.25,1.1,ROOF,-.5,3.1,-.3,g);box(.9,1.0,.9,CREAM,-1.5,.5,1.1,g);for(let i=0;i<5;i++)box(.18,.3+i*.25,.18,LEAF,1.1-i*.4,.5,-1.4,g);}
+  // people
+  const np=3+Math.floor(rnd()*3);for(let i=0;i<np;i++){const a=rnd()*6.28,r=1.2+rnd()*1.0;person(Math.cos(a)*r,Math.sin(a)*r,g,SHIRTS[Math.floor(rnd()*SHIRTS.length)],rnd);}
+  // car on ring road
+  const c=car(g,[ROOF,0x2f86c7,0xf7c948,0x4fae5a][idx%4]);c.userData.drive={a:rnd()*6.28,sp:(.35+rnd()*.25)*(idx%2?1:-1)};
+  if(idx%3===0){const c2=car(g,0xe06c9f);c2.userData.drive={a:rnd()*6.28,sp:(.3+rnd()*.2)*(idx%2?-1:1)};}
+  // place
+  const d=isl.ring===0?0:isl.ring===1?8.6:14.8;const a=isl.ang*Math.PI/180;
+  g.position.set(Math.cos(a)*d,0,Math.sin(a)*d);g.userData.id=isl.id;g.userData.phase=rnd()*6.28;
+  g.traverse(o=>{if(o.isMesh)o.userData.pick=isl.id;});
+  islandGroup.add(g);meshes.push(g);
+  const t=document.createElement("div");t.className="tag"+(modes.tags?" on":"");t.style.setProperty("--c",isl.color);
+  t.innerHTML=`<span>${isl.name[lang]}</span><small>${isl.items.length} ${T("items")}</small>`;stage.appendChild(t);tagEls[isl.id]=t;
+}
+ISL.forEach(buildIsland);
+
+/* bridges: roads from hub to inner ring, rail loop around inner ring, rail spurs to outer islands */
+const linkGroup=new THREE.Group();scene.add(linkGroup);
+const posOf=id=>meshes.find(m=>m.userData.id===id).position;
+function bridge(a,b,type){const g=new THREE.Group();const dir=b.clone().sub(a);const len=dir.length()-6.2;const mid=a.clone().add(b).multiplyScalar(.5);
+  const deck=box(len,.22,type==="rail"?.9:1.1,type==="rail"?0x8a6a4e:0xe9e2d3,0,0,0,g);deck.position.y=.33;
+  if(type==="road"){for(let x=-len/2+.6;x<len/2;x+=1.2)box(.5,.03,.08,0xf7c948,x,.45,0,g);box(len,.12,.08,0xdb6a41,0,.45,.52,g);box(len,.12,.08,0xdb6a41,0,.45,-.52,g);}
+  else{box(len,.05,.06,0x4a4a4a,0,.45,.25,g);box(len,.05,.06,0x4a4a4a,0,.45,-.25,g);for(let x=-len/2+.3;x<len/2;x+=.7)box(.18,.04,.8,0x5a4030,x,.44,0,g);}
+  for(let x=-len/2+1.5;x<len/2-1;x+=3){cyl(.16,.2,1.3,0xd9b57f,x,-.95,.3,g,8);cyl(.16,.2,1.3,0xd9b57f,x,-.95,-.3,g,8);}
+  g.position.copy(mid);g.rotation.y=-Math.atan2(dir.z,dir.x);linkGroup.add(g);return {a:a.clone(),b:b.clone(),len};}
+const roads=[],rails=[];
+const inner=ISL.filter(i=>i.ring===1).map(i=>i.id);
+inner.forEach(id=>roads.push(bridge(posOf("hub"),posOf(id),"road")));
+const loopPts=[];inner.forEach((id,i)=>{const n=inner[(i+1)%inner.length];rails.push(bridge(posOf(id),posOf(n),"rail"));});
+rails.push(bridge(posOf("tax"),posOf("rd"),"rail"));rails.push(bridge(posOf("hr"),posOf("fin"),"rail"));
+/* train on the loop */
+const loop=new THREE.CurvePath();inner.forEach((id,i)=>{const n=inner[(i+1)%inner.length];loop.add(new THREE.LineCurve3(posOf(id).clone().setY(.56),posOf(n).clone().setY(.56)));});
+function trainCar(col,engine){const c=new THREE.Group();box(1.1,.45,.6,col,0,0,0,c);box(.9,.2,.5,CREAM,0,.45,0,c);if(engine){cyl(.14,.14,.4,DARK,.3,.65,0,c,8);box(.4,.4,.6,0xf7c948,-.3,.45,0,c);}
+  for(let i=0;i<3;i++)box(.18,.18,.04,0xbfe3fb,-.35+i*.35,.5,.31,c);[[-.3,.33],[.3,.33],[-.3,-.33],[.3,-.33]].forEach(([x,z])=>{const w=cyl(.11,.11,.06,DARK,x,0,z,c,10);w.rotation.x=Math.PI/2;w.position.y=.05;});c.position.y=.46;scene.add(c);return c;}
+const train=[trainCar(0xdb6a41,true),trainCar(0x2f86c7,false),trainCar(0x4fae5a,false)];let trainT=0;
+/* cars shuttling on the spoke roads */
+const shuttles=roads.map((r,i)=>{const c=car(scene,[0xf7c948,0xe06c9f,0x2f86c7][i%3]);c.userData.shuttle={r,t:Math.random(),dir:1,sp:.12+Math.random()*.06};return c;});
+/* boats between islands, plane overhead */
+const boats=[];[[0xdb6a41,11.5,.12,0],[0x2f86c7,17.5,-.08,2],[0xf7c948,6.0,.16,4]].forEach(([c,r,sp,ph])=>{const b=boat(c);b.userData.sail={r,sp,a:ph};scene.add(b);boats.push(b);});
+const air=plane();air.userData.fly={r:20,sp:.22,a:0,h:9.5};scene.add(air);
+
+const pairs={};ISL.forEach(i=>i.items.forEach(it=>(it.links||[]).forEach(l=>{const k=[i.id,l].sort().join("|");pairs[k]=(pairs[k]||0)+1;})));
+const lineObjs=[];
+Object.entries(pairs).forEach(([k,n])=>{const [a,b]=k.split("|").map(id=>meshes.find(m=>m.userData.id===id));const pa=a.position.clone(),pb=b.position.clone();const mid=pa.clone().add(pb).multiplyScalar(.5);mid.y=3.4+n*.5;
+  const curve=new THREE.QuadraticBezierCurve3(pa.clone().setY(.6),mid,pb.clone().setY(.6));const geo=new THREE.BufferGeometry().setFromPoints(curve.getPoints(40));
+  const m=new THREE.LineDashedMaterial({color:0xfff2d0,dashSize:.5,gapSize:.3,transparent:true,opacity:.35+Math.min(n,4)*.1});const line=new THREE.Line(geo,m);line.computeLineDistances();line.userData.ids=[a.userData.id,b.userData.id];lineGroup.add(line);lineObjs.push(line);});
+applyTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+function highlight(id){meshes.forEach(m=>{m.userData.lift=(id&&m.userData.id===id)?1:0;});
+  lineObjs.forEach(l=>{const on=!id||l.userData.ids.includes(id);l.material.opacity=on?(id?1:.6):.1;l.material.color.set(id&&on?0xdb6a41:0xfff2d0);});}
+function focusIsland(id){const m=meshes.find(x=>x.userData.id===id);cam.ttx=m.position.x;cam.ttz=m.position.z;cam.targetR=modes.bird?22:17;cam.auto=false;openPanel(id);}
+
+/* interaction */
+const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();let hover=null;
+let drag=null,moved=0,lastPinch=0;
+const el=renderer.domElement;
+function setPtr(e){const r=el.getBoundingClientRect();ptr.x=((e.clientX-r.left)/r.width)*2-1;ptr.y=-((e.clientY-r.top)/r.height)*2+1;}
+function pick(e){setPtr(e);ray.setFromCamera(ptr,camera);const hit=ray.intersectObjects(islandGroup.children,true)[0];return hit?hit.object.userData.pick:null;}
+el.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,th:cam.theta,ph:cam.phi,id:e.pointerId};moved=0;cam.auto=false;});
+el.addEventListener("pointermove",e=>{
+  if(drag&&drag.id===e.pointerId&&(e.buttons||e.pointerType==="touch")){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved=Math.max(moved,Math.abs(dx)+Math.abs(dy));if(moved>8){cam.theta=drag.th-dx*.006;cam.targetPhi=cam.phi=Math.max(.15,Math.min(1.35,drag.ph+dy*.005));modes.bird=cam.phi<.35;document.getElementById("m-bird").setAttribute("aria-pressed",String(modes.bird));}return;}
+  if(e.pointerType==="mouse"){const id=pick(e);if(id!==hover){hover=id;el.style.cursor=id?"pointer":"grab";if(!modes.tags)Object.entries(tagEls).forEach(([k,t])=>t.classList.toggle("on",k===id));}}
+});
+el.addEventListener("pointerup",e=>{if(drag&&moved<=8){const id=pick(e);if(id)focusIsland(id);}drag=null;});
+el.addEventListener("pointercancel",()=>{drag=null;});
+el.addEventListener("wheel",e=>{e.preventDefault();cam.targetR=Math.max(12,Math.min(60,cam.targetR+e.deltaY*.03));},{passive:false});
+el.addEventListener("touchmove",e=>{if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(lastPinch)cam.targetR=Math.max(12,Math.min(60,cam.targetR-(d-lastPinch)*.08));lastPinch=d;drag=null;}},{passive:true});
+el.addEventListener("touchend",()=>{lastPinch=0;});
+
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+addEventListener("resize",resize);resize();
+
+const v3=new THREE.Vector3();let t0=performance.now();
+function frame(now){
+  const dt=modes.pause?0:Math.min(.05,(now-t0)/1000);t0=now;
+  if(cam.auto)cam.theta+=dt*.06;
+  cam.phi+=(cam.targetPhi-cam.phi)*.08;cam.r+=(cam.targetR-cam.r)*.08;cam.tx+=(cam.ttx-cam.tx)*.08;cam.tz+=(cam.ttz-cam.tz)*.08;
+  camera.position.set(cam.tx+cam.r*Math.sin(cam.phi)*Math.cos(cam.theta),cam.r*Math.cos(cam.phi),cam.tz+cam.r*Math.sin(cam.phi)*Math.sin(cam.theta));
+  camera.lookAt(cam.tx,0.5,cam.tz);
+  const tm=now/1000;
+  meshes.forEach(m=>{const bob=modes.pause?0:Math.sin(tm*.9+m.userData.phase)*.1;const lift=(m.userData.lift||0)*.5;m.position.y+=((bob+lift+(hover===m.userData.id?.25:0))-m.position.y)*.12;
+    if(dt>0)m.traverse(o=>{if(o.userData.spin)o.rotation.z+=dt*1.5;if(o.userData.bob)o.position.y=2.3+Math.sin(tm*2+1)*.12;if(o.userData.flag)o.rotation.y=Math.sin(tm*3)*.25;
+      if(o.userData.walk){const w=o.userData.walk;w.a+=dt*w.sp*.6;o.position.x=w.cx+Math.cos(w.a)*w.r*.5;o.position.z=w.cz+Math.sin(w.a)*w.r*.5;o.position.y=.5+Math.abs(Math.sin(tm*8+w.ph))*.05;o.rotation.y=-w.a+Math.PI/2;}
+      if(o.userData.drive){const d=o.userData.drive;d.a+=dt*d.sp;o.position.x=Math.cos(d.a)*2.55;o.position.z=Math.sin(d.a)*2.55;o.rotation.y=-d.a+(d.sp>0?Math.PI:0);}});});
+  if(dt>0){boats.forEach(b=>{const s=b.userData.sail;s.a+=dt*s.sp;b.position.x=Math.cos(s.a)*s.r;b.position.z=Math.sin(s.a)*s.r;b.position.y=-.55+Math.sin(tm*1.6+s.a)*.08;b.rotation.y=-s.a+(s.sp>0?Math.PI:0);b.rotation.z=Math.sin(tm*1.3)*.04;b.traverse(o=>{if(o.userData.flag)o.rotation.y=Math.sin(tm*4)*.3;});});
+    trainT=(trainT+dt*.035)%1;train.forEach((c,i)=>{const u=(trainT-i*.011+1)%1;const pt=loop.getPointAt(u),tg=loop.getTangentAt(u);c.position.set(pt.x,.46,pt.z);c.rotation.y=-Math.atan2(tg.z,tg.x);});
+    shuttles.forEach(c=>{const sh=c.userData.shuttle;sh.t+=dt*sh.sp*sh.dir;if(sh.t>1){sh.t=1;sh.dir=-1}if(sh.t<0){sh.t=0;sh.dir=1}const pA=sh.r.a,pB=sh.r.b;const d=pB.clone().sub(pA);const u=.26+sh.t*.48;c.position.set(pA.x+d.x*u,.5,pA.z+d.z*u);c.rotation.y=-Math.atan2(d.z,d.x)+(sh.dir>0?0:Math.PI);});
+    const f=air.userData.fly;f.a+=dt*f.sp;air.position.set(Math.cos(f.a)*f.r,f.h+Math.sin(tm*.7)*.4,Math.sin(f.a)*f.r);air.rotation.y=-f.a+Math.PI;air.rotation.z=-.18;air.traverse(o=>{if(o.userData.prop)o.rotation.x+=dt*30;});
+    clouds.children.forEach(c=>{c.position.x+=dt*c.userData.v;if(c.position.x>70)c.position.x=-70;});
+    rings.forEach(r=>{const s=1+((tm+r.userData.s)%6)/6*2.2;r.scale.set(s,s,1);r.material.opacity=.35*(1-((tm+r.userData.s)%6)/6);});}
+  const w=stage.clientWidth,h=stage.clientHeight;
+  meshes.forEach(m=>{const t=tagEls[m.userData.id];if(!t.classList.contains("on"))return;v3.set(m.position.x,m.position.y+3.9,m.position.z).project(camera);
+    const x=(v3.x+1)/2*w,y=(1-v3.y)/2*h;t.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`;t.style.opacity=v3.z<1?"":"0";});
+  renderer.render(scene,camera);requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* intro */
+document.getElementById("loading").hidden=true;
+document.getElementById("go").addEventListener("click",()=>{document.getElementById("intro").classList.add("off");cam.targetR=30;});
+
+applyLang();
+</script>
+</body>
+</html>
